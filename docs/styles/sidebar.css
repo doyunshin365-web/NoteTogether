@@ -1,0 +1,88 @@
+/* =============== 우측 사이드바 (도움말) =============== */
+.right-sidebar {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    /* 기본적으로 숨김 */
+    width: 320px;
+    height: 100%;
+    background: white;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.right-sidebar.open {
+    right: 0;
+}
+
+.sidebar-header {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.close-sidebar-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #777;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-sidebar-btn:hover {
+    color: #333;
+}
+
+.sidebar-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: #fdfdfd;
+}
+
+.sidebar-search-container {
+    margin-bottom: 20px;
+}
+
+.sidebar-search-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    /* Square-ish */
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.sidebar-search-input:focus {
+    border-color: #2487ac;
+    outline: none;
+}
+
+.sidebar-content-placeholder {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.sidebar-content-placeholder ul li {
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.sidebar-content-placeholder ul li:hover {
+    text-decoration: underline;
+    color: #2487ac;
+}

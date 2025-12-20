@@ -1,0 +1,905 @@
+/* =============== 공통 세팅 =============== */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: #f3f3f3;
+  /* Light gray desk background */
+}
+
+/* =============== 컨테이너 =============== */
+.login,
+.register {
+  width: 420px !important;
+}
+
+.container {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  padding: 0 16px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.logo {
+  height: 50px;
+  margin: 10px;
+}
+
+/* =============== 텍스트 =============== */
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #222831;
+  margin: 30px 0 20px;
+}
+
+.main_menu .title {
+  margin-top: 0px;
+}
+
+.subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #393e46;
+  margin: 24px 0 12px;
+}
+
+.hyperlink {
+  font-size: 14px;
+  color: #2487ac;
+  text-align: center;
+  margin: 20px 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.hyperlink:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* =============== 입력창 & 버튼 =============== */
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 14px 4px 10px;
+  font-size: 18px;
+  border: none;
+  border-bottom: 2px solid #d0d7e2;
+  background: none;
+  color: #222;
+  margin-top: 20px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+input::placeholder {
+  color: #9ca4b0;
+}
+
+input:hover {
+  border-bottom-color: #b0b8c1;
+}
+
+input:focus {
+  border-bottom: 2px solid #2487ac;
+  outline: none;
+}
+
+button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn) {
+  width: 100%;
+  padding: 16px 0;
+  margin-top: 30px;
+  background: #2487ac;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn):hover {
+  background: #1d6b8f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(36, 135, 172, 0.3);
+}
+
+button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn):active {
+  opacity: 0.9;
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(36, 135, 172, 0.2);
+}
+
+/* =============== 메뉴바 =============== */
+.menubar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 340px;
+  padding: 8px 20px;
+  background: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+  z-index: 100;
+}
+
+.menubar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 3px;
+  border-radius: 999px;
+  background: #d1d1d1;
+}
+
+.menubar .item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+  color: #b0b8c1;
+  gap: 0px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.menubar .item img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.5;
+  margin-bottom: -4px;
+}
+
+.menubar .item:hover {
+  color: #222831;
+  transform: translateY(-1px);
+}
+
+.menubar .item:hover img {
+  filter: none;
+  opacity: 1;
+}
+
+.menubar .item.active {
+  color: #222831;
+  font-weight: 600;
+}
+
+.menubar .item.active img {
+  filter: none;
+  opacity: 1;
+}
+
+/* =============== 메뉴바 안 내용들 =============== */
+.menubar_item {
+  padding-bottom: 100px;
+  min-height: calc(100vh - 70px);
+}
+
+.menubar_item.home {
+  padding-top: 0px;
+}
+
+.recent_changes,
+.friends,
+.developerNOW {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  min-height: 80px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s ease;
+}
+
+.recent_changes:hover,
+.friends:hover,
+.developerNOW:hover {
+  border-color: #a8d4e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.recent_changes:empty::before,
+.friends:empty::before,
+.developerNOW:empty::before {
+  content: "내용이 없습니다";
+  display: block;
+  color: #9ca4b0;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+}
+
+/* =============== 노트 아이템 =============== */
+.note_item {
+  background: #e6f4f8;
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid #b8d4e0;
+}
+
+.note_item .note_title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222831;
+  margin-bottom: 10px;
+}
+
+.note_editors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editor_item {
+  background: #2487ac;
+  color: white;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* =============== 친구 테이블 =============== */
+.friend_table {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  margin-bottom: 10px;
+}
+
+.profile_pic {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ccc;
+}
+
+.friend_table .info {
+  display: flex;
+  flex-direction: column;
+}
+
+.friend_table .friend_name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #222831;
+}
+
+.friend_table .message {
+  font-size: 12px;
+  color: #777;
+}
+
+/* =============== 메뉴 아이템 =============== */
+.my_profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 12px;
+}
+
+.my_profile .info {
+  display: flex;
+  flex-direction: column;
+}
+
+.my_name {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.message {
+  font-size: 12px;
+  color: #555;
+}
+
+.menu_item {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.menu_item:hover {
+  background: #f0f0f0;
+}
+
+/* =============== 리본 메뉴 =============== */
+.editormain {
+  width: 100%;
+  background: white;
+}
+
+.editor_header {
+  border-bottom: 1px solid #d0d0d0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ribbonmenu {
+  display: flex;
+  background: #2487ac;
+  /* Deep Office Blue for top bar */
+  padding: 0;
+  border-bottom: none;
+  min-height: 44px;
+}
+
+.ribbonmenu button {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin: 0;
+  border-radius: 0;
+  width: auto;
+  position: relative;
+  white-space: nowrap;
+}
+
+.ribbonmenu button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: none;
+  box-shadow: none;
+}
+
+.ribbonmenu button.active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ribbonmenu button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: white;
+}
+
+.ribbon_file,
+.ribbon_home,
+.ribbon_design,
+.ribbon_insert,
+.ribbon_layout,
+.ribbon_view {
+  display: none;
+  padding: 2px 12px 0 12px;
+  background: #f4f6fa;
+  min-height: 0;
+  height: 68px;
+  border-bottom: 1px solid #d0d0d0;
+  gap: 10px;
+  align-items: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.ribbon_file.active,
+.ribbon_home.active,
+.ribbon_design.active,
+.ribbon_insert.active,
+.ribbon_layout.active,
+.ribbon_view.active {
+  display: flex;
+}
+
+.ribbon_group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 62px;
+  padding: 0 7px 16px 7px;
+  margin: 0 3px 0 0;
+  background: none;
+  position: relative;
+}
+
+.ribbon_group_label {
+  font-size: 10px;
+  color: #778;
+  text-align: center;
+  font-weight: 400;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  padding: 0 2px;
+}
+
+/* 큰 버튼/작은 버튼 공통 */
+.ribbon_group button {
+  border-radius: 2.5px;
+  border: 1px solid #ccd5e0;
+  margin: 0 0 2px 0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(30, 30, 60, 0.03);
+  font-size: 11px;
+  padding: 0 6px;
+  height: 24px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.button-large {
+  height: 44px;
+  min-width: 48px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.icon {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  background: #c4cee1;
+  border-radius: 2px;
+  margin-right: 2.5px;
+}
+
+.button-large .icon {
+  width: 23px;
+  height: 23px;
+  margin-right: 3px;
+}
+
+/* =============== 반응형 =============== */
+@media (max-width: 480px) {
+  .container {
+    width: 100%;
+  }
+
+  .menubar {
+    width: calc(100% - 40px);
+    max-width: 340px;
+  }
+}
+
+.content {
+  width: 794px;
+  /* A4 가로 (px 기준) */
+  min-height: 1123px;
+  /* A4 세로 */
+  margin: 20px auto;
+  /* 가운데 정렬 */
+  padding: 40px;
+  /* 여백 */
+  background: white;
+  /* 종이색 */
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  /* 그림자 */
+  border: 1px solid #ddd;
+  outline: none;
+  box-sizing: border-box;
+
+  /* 타자기 느낌으로 글 부드럽게 */
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.content:hover {
+  box-shadow: 0 6px 24px rgba(36, 135, 172, 0.12);
+  border-color: #a8d4e6;
+}
+
+.content:focus {
+  outline: none;
+  border-color: #2487ac;
+  box-shadow: 0 6px 24px rgba(36, 135, 172, 0.15);
+}
+
+.editor_header {
+  background-color: #2487ac;
+  /* Deep Office Blue */
+  text-align: left;
+  display: flex;
+  height: 40px;
+}
+
+.menu_item {
+  color: white;
+  justify-content: center;
+  width: 50px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.menu_item:hover {
+  background: #15546b;
+}
+
+.menu_button {
+  border: 1px solid transparent;
+  /* Remove visible border by default */
+  width: 80px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  /* Slightly sharper corners */
+  background: transparent;
+  color: #252525;
+  /* Dark gray text */
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  /* Remove shadow */
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.nh_menu_button {
+  border: 1px solid #d1d1d1;
+  width: 80px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: white;
+  color: #252525;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  margin-top: 0px !important;
+  padding: 0px !important;
+}
+
+.menu_button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #c8c8c8;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.menu_button:hover {
+  color: black;
+  background-color: #e1dfdd;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.menu_button:hover::before {
+  opacity: 1;
+}
+
+.menu_button:active {
+  background-color: #d0d0d0;
+  box-shadow: none;
+}
+
+.editor_menu {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: white;
+}
+
+.menu_content {
+  padding: 10px;
+  background-color: #f3f2f1;
+  /* Light gray toolbar background */
+  display: flex;
+  border-bottom: 1px solid #e1dfdd;
+}
+
+.menu_item_content {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* =============== 컬러 피커 =============== */
+.color-picker-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.color-picker-container {
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.color-picker-header {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.color-picker-header label {
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.automatic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.automatic-row:hover {
+  background: #f0f0f0;
+}
+
+.color-picker-section {
+  margin-bottom: 12px;
+}
+
+.color-picker-label {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.theme-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.standard-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: transform 0.1s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+  border-color: #000;
+  z-index: 1;
+  position: relative;
+}
+
+.color-picker-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.color-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 12px;
+}
+
+.color-picker-option:hover {
+  background: #f0f0f0;
+}
+
+.gradient-icon {
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(45deg, #ff0000, #00ff00, #0000ff);
+  border: 1px solid #ccc;
+  border-radius: 2px;
+}
+
+/* =============== 우측 사이드바 (도움말) =============== */
+.right-sidebar {
+  position: fixed;
+  top: 0;
+  right: -420px;
+  /* Width + Shadow margin */
+  width: 400px;
+  /* Increased Width */
+  height: 100%;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.right-sidebar.open {
+  right: 0;
+}
+
+.sidebar-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.sidebar-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-sidebar-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #777;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  width: auto !important;
+  /* Force auto width */
+  margin-top: 0 !important;
+  /* Remove margin */
+  border-radius: 4px;
+}
+
+.close-sidebar-btn:hover {
+  background: #e9ecef;
+  color: #333;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.sidebar-body {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.sidebar-search-container {
+  margin-bottom: 20px;
+}
+
+.sidebar-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.sidebar-search-input:focus {
+  border-color: #2487ac;
+  outline: none;
+}
+
+.sidebar-content-placeholder {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sidebar-content-placeholder ul li {
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.sidebar-content-placeholder ul li:hover {
+  text-decoration: underline;
+  color: #2487ac;
+}
+
+/* =============== 도형 스타일 =============== */
+.shape-container {
+  display: inline-block;
+  position: relative;
+  cursor: pointer;
+  vertical-align: middle;
+  /* padding: 2px; */
+  border: 1px solid transparent;
+  /* 기본 테두리 없음 */
+  line-height: 0;
+  /* SVG 하단 공백 제거 */
+  user-select: none;
+}
+
+.shape-container:focus {
+  outline: none;
+  border: 1px dashed #2487ac;
+  /* 선택 시 테두리 */
+}
+
+/* 리사이즈 핸들 (우측 하단) */
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: 1px solid #2487ac;
+  right: -5px;
+  bottom: -5px;
+  cursor: se-resize;
+  display: none;
+  /* 기본 숨김 */
+  z-index: 10;
+}
+
+.shape-container:focus .resize-handle,
+.shape-container.selected .resize-handle {
+  display: block;
+  /* 선택 시 보임 */
+}
+
+/* SVG가 컨테이너를 가득 채우도록 */
+.shape-container svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

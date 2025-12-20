@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>노트투게더</title>
+    <link rel="stylesheet" href="./styles/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Nanum+Gothic&family=Nanum+Myeongjo&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="container login">
+        <div class="menu">
+            <img src="./imgs/logo.png" alt="" class="logo">
+        </div>
+        <p class="title">로그인</p>
+        <input type="text" id="id_input" placeholder="ID 입력">
+        <input type="password" id="pw_input" placeholder="비밀번호 입력">
+        <button id="login_submit">로그인</button>
+        <p class="hyperlink" id="register_link">계정이 없으십니까?</p>
+    </div>
+    <div class="container register" style="display: none;">
+        <div class="menu">
+            <img src="./imgs/logo.png" alt="" class="logo">
+        </div>
+        <p class="title">회원가입</p>
+        <input type="text" id="id_input_register" placeholder="ID 입력">
+        <input type="password" id="pw_input_register" placeholder="비밀번호 입력">
+        <button id="register_submit">가입</button>
+    </div>
+    <div class="container main_menu" style="display: none;">
+        <!-- index 최상위. -->
+        <div class="top_menu">
+            <img src="./imgs/logo.png" alt="" class="logo">
+        </div>
+        <div class="menubar">
+            <div class="item active" id="mainmenu_item1">
+                <!-- 아이콘 -->
+                <img src="./svgs/home.svg" alt="">
+                <!-- 라벨 -->
+                <p>홈</p>
+            </div>
+            <div class="item" id="mainmenu_item2">
+                <!-- 아이콘 -->
+                <img src="./svgs/note.svg" alt="">
+                <!-- 라벨 -->
+                <p>노트</p>
+            </div>
+            <div class="item" id="mainmenu_item3">
+                <!-- 아이콘 -->
+                <img src="./svgs/friends.svg" alt="">
+                <!-- 라벨 -->
+                <p>워크스페이스</p>
+            </div>
+            <div class="item" id="mainmenu_item4">
+                <!-- 아이콘 -->
+                <img src="./svgs/setting.svg" alt="">
+                <!-- 라벨 -->
+                <p>설정</p>
+            </div>
+        </div>
+        <div class="menubar_item home">
+            <p class="title">환영합니다, <span class="username" style="color: #2487ac;">유저이름</span>님.</p>
+            <p class="subtitle">최근 변경</p>
+            <div class="recent_changes">
+
+            </div>
+            <p class="subtitle">친구</p>
+            <div class="friends">
+
+            </div>
+            <p class="subtitle">지금 개발자는:</p>
+            <div class="developerNOW">
+
+            </div>
+        </div>
+        <div class="menubar_item note" style="display: none;">
+            <p class="title">최근 노트</p>
+            <div class="add_new_note"><svg xmlns="http://www.w3.org/2000/svg" width="108" height="108"
+                    class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
+                    <path
+                        d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3z" />
+                </svg></div>
+            <!-- <div class="note_item">
+                <p class="note_title">노트 제목</p>
+                <div class="note_editors">
+                    <div class="editor_item">에디터1</div>
+                </div>
+            </div> -->
+        </div>
+        <div class="menubar_item workspace" style="display: none;">
+            <p class="title">내 워크스페이스</p>
+
+        </div>
+        <div class="menubar_item menu" style="display: none;">
+            <p class="title">전체 메뉴</p>
+            <div class="my_profile">
+                <img src="" alt="" class="profile_pic">
+                <div class="info">
+                    <p class="my_name"></p>
+                    <p class="message"></p>
+                </div>
+            </div>
+            <div class="menu_item">
+                <img src="" alt="">
+                <p>아이템</p>
+            </div>
+            <p>Indev Version. 2025. 12. 13.</p>
+        </div>
+    </div>
+    <div class="container editor_main" style="display: none;">
+        <div class="editor_menu">
+            <div class="editor_header">
+                <div class="menu_item home_item">홈</div>
+                <div class="menu_item add_item">삽입</div>
+                <div class="menu_item AI_item">AI</div>
+                <div class="menu_item help_item">도움말</div>
+            </div>
+            <div class="menu_content">
+                <div class="menu_item_content home_content">
+                    <div class="menu_button" id="memberToggleBtn">멤버</div>
+                    <div class="menu_button" id="saveNoteBtn">저장</div>
+                    <div class="menu_button">붙여넣기</div>
+                    <select name="fontSelect" id="fontSelect" class="nh_menu_button" style="width: 190px;">
+                        <option value="default">시스템</option>
+                        <option value="'Noto Sans KR'">Noto Sans KR</option>
+                        <option value="'Nanum Gothic'">나눔고딕</option>
+                        <option value="'Nanum Myeongjo'">나눔명조</option>
+                        <option value="Batang">바탕</option>
+                        <option value="Dotum">돋움</option>
+                        <option value="Gungsuh">궁서</option>
+                    </select>
+                    <select id="fontSizeSelect" class="nh_menu_button" style="width: 80px; margin-right: 5px;">
+                        <option value="10px">10</option>
+                        <option value="11px">11</option>
+                        <option value="12px">12</option>
+                        <option value="14px">14</option>
+                        <option value="16px" selected>16</option>
+                        <option value="18px">18</option>
+                        <option value="20px">20</option>
+                        <option value="22px">22</option>
+                        <option value="24px">24</option>
+                        <option value="26px">26</option>
+                        <option value="28px">28</option>
+                        <option value="36px">36</option>
+                        <option value="48px">48</option>
+                        <option value="72px">72</option>
+                    </select>
+                    <div class="menu_button" style="width: 10px; font-weight: bold;">T</div>
+                    <div class="menu_button" style="width: 10px; font-style: italic;">T</div>
+                    <div class="menu_button" style="width: 10px; text-decoration: line-through;">T</div>
+                    <div class="menu_button" style="width: 10px; color: black;">C</div>
+                </div>
+                <div class="menu_item_content add_content">
+                    <div class="menu_button">표</div>
+                    <div class="menu_button">이미지</div>
+                    <div class="menu_button">도형</div>
+                    <div class="menu_button">링크</div>
+                    <div class="menu_button">워터마크</div>
+                </div>
+                <div class="menu_item_content AI_content">
+                    <input type="text" id="aiInstructionInput" style="width: 500px;" class="nh_menu_button"
+                        placeholder="교정할 내용을 입력하세요. (예: 문법 교정, 말투 변경 등)">
+                    <div class="menu_button" id="aiProofreadBtn">교정</div>
+                </div>
+                <div class="menu_item_content help_content">
+                    <div class="menu_button" id="helpToggleBtn">도움말</div>
+                    <div class="menu_button" id="infoToggleBtn">정보</div>
+                </div>
+            </div>
+        </div>
+        <div class="content" contenteditable="true">
+
+        </div>
+    </div>
+
+    <!-- 컬러 피커 모달 -->
+    <div id="colorPickerModal" class="color-picker-modal" style="display: none;">
+        <div class="color-picker-container">
+            <div class="color-picker-header">
+                <input type="checkbox" id="highContrastOnly"> <label for="highContrastOnly">고대비 전용</label>
+            </div>
+            <div class="color-picker-row automatic-row">
+                <div class="color-swatch" style="background: #000000;"></div>
+                <span>자동(A)</span>
+            </div>
+
+            <div class="color-picker-section">
+                <div class="color-picker-label">테마 색</div>
+                <div class="theme-colors-grid" id="themeColorsGrid"></div>
+            </div>
+
+            <div class="color-picker-section">
+                <div class="color-picker-label">표준 색</div>
+                <div class="standard-colors-grid" id="standardColorsGrid"></div>
+            </div>
+
+            <div class="color-picker-footer">
+                <div class="color-picker-option" id="moreColorsBtn">
+                    <div class="color-icon gradient-icon"></div>
+                    <span>다른 색(M)...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 우측 사이드바 (도움말 등) -->
+    <div id="rightSidebar" class="right-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">도움말</span>
+            <button class="close-sidebar-btn" id="closeSidebarBtn">&times;</button>
+        </div>
+        <div class="sidebar-body">
+            <div class="sidebar-search-container">
+                <input type="text" class="sidebar-search-input" placeholder="도움말 검색">
+            </div>
+            <div class="sidebar-content-placeholder">
+                <p>노트투게더 도움말 페이지입니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 멤버 사이드바 -->
+    <div id="memberSidebar" class="right-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">멤버</span>
+            <button class="close-sidebar-btn" id="closeMemberSidebarBtn">&times;</button>
+        </div>
+        <div class="sidebar-body">
+            <div style="margin-bottom: 20px;">
+                <p style="font-size: 14px; color: #555; margin-bottom: 10px;">멤버 추가:</p>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="addMemberInput" placeholder="사용자 ID 입력"
+                        style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                    <button id="addMemberBtn"
+                        style="padding: 8px 16px; background: #2487ac; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                        추가
+                    </button>
+                </div>
+            </div>
+            <p style="margin-bottom: 15px; font-size: 14px; color: #555;">현재 이 문서에 접속 중인 멤버:</p>
+            <div id="activeMembersList">
+                <!-- 동적으로 추가됨 -->
+            </div>
+            <p style="margin: 20px 0 10px 0; font-size: 14px; color: #555;">모든 편집자:</p>
+            <div id="allEditorsList">
+                <!-- 동적으로 추가됨 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 정보 사이드바 -->
+    <div id="infoSidebar" class="right-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">노트투게더</span>
+            <button class="close-sidebar-btn" id="closeInfoSidebarBtn">&times;</button>
+        </div>
+        <div class="sidebar-body">
+            <img src="./imgs/logo.png" alt="" class="logo">
+            <p style="margin-bottom: 20px; font-size: 14px; color: #555;">노트투게더 0.5</p>
+            <p>Indev Version. 2025. 12. 13.</p>
+            <p>ⓒ2025</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./scripts/app.js"></script>
+</body>
+
+</html>
