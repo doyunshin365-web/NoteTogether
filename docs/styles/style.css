@@ -102,51 +102,17 @@ body {
 body {
   display: flex;
   justify-content: center;
-  align-items: center;
-  /* Vertically center login form */
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  /* Premium Gradient */
-  background-attachment: fixed;
-  min-height: 100vh;
+  align-items: flex-start;
+  background: #f3f3f3;
+  /* Light gray desk background */
 }
 
 /* =============== 컨테이너 =============== */
 .login,
 .register {
-  width: 450px !important;
-  height: auto !important;
-  padding: 50px 40px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  /* Glass effect */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: white !important;
-  animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 420px !important;
 }
 
-.login .logo,
-.register .logo {
-  filter: brightness(0) invert(1);
-  opacity: 0.9;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 
 /* Main App Container Override */
 .main_menu,
@@ -178,12 +144,23 @@ body {
 /* =============== 텍스트 =============== */
 .title {
   font-size: 32px;
-  font-weight: 800;
-  /* Bold */
-  color: white;
-  /* Glass text */
-  margin: 20px 0 10px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-weight: 700;
+  color: #222831;
+  margin: 30px 0 20px;
+}
+
+.hyperlink {
+  font-size: 14px;
+  color: #2487ac;
+  text-align: center;
+  margin: 20px 0;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.hyperlink:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 
 .main_menu .title,
@@ -205,85 +182,48 @@ body {
   margin: 24px 0 12px;
 }
 
-.hyperlink {
-  font-size: 14px;
-  color: #2487ac;
-  text-align: center;
-  margin: 20px 0;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.hyperlink:hover {
-  opacity: 0.8;
-  text-decoration: underline;
-}
 
 /* =============== 입력창 & 버튼 =============== */
 input[type="text"],
 input[type="password"] {
   width: 100%;
-  padding: 15px 20px;
-  font-size: 16px;
+  padding: 14px 4px 10px;
+  font-size: 18px;
   border: none;
-  border-radius: 50px;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  margin-top: 15px;
+  border-bottom: 2px solid #d0d7e2;
+  background: none;
+  color: #222;
+  margin-top: 20px;
   box-sizing: border-box;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
 }
 
 input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+  color: #9ca4b0;
 }
 
 input:hover {
-  background: rgba(255, 255, 255, 0.25);
+  border-bottom-color: #b0b8c1;
 }
 
 input:focus {
-  background: rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid #2487ac;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
-  transform: scale(1.02);
-}
-
-/* Override for Main App inputs to look standard */
-.main_menu input,
-.modal input {
-  background: white;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.main_menu input:focus,
-.modal input:focus {
-  border-color: #2487ac;
-  box-shadow: 0 0 0 2px rgba(36, 135, 172, 0.2);
-  background: white;
-  transform: none;
 }
 
 button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn) {
   width: 100%;
-  padding: 18px 0;
+  padding: 16px 0;
   margin-top: 30px;
-  background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
-  /* Vibrant Gradient */
+  background: #2487ac;
   color: white;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   border: none;
-  border-radius: 50px;
+  border-radius: 25px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   box-sizing: border-box;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
 button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn):hover {

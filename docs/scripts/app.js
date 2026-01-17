@@ -45,12 +45,12 @@ let currentNotes = [];
 
 register_link.addEventListener('click', () => {
     login_div.style.display = 'none';
-    register_div.style.display = 'flex';
+    register_div.style.display = 'block';
 });
 
 document.getElementById('back_to_login').addEventListener('click', () => {
     register_div.style.display = 'none';
-    login_div.style.display = 'flex';
+    login_div.style.display = 'block';
 });
 
 register_btn.addEventListener('click', async () => {
@@ -74,7 +74,7 @@ register_btn.addEventListener('click', async () => {
         if (data.message === "1") {
             alert("회원가입 성공! 로그인 해주세요.");
             register_div.style.display = 'none';
-            login_div.style.display = 'flex';
+            login_div.style.display = 'block';
         } else {
             alert("회원가입 실패: " + (data.error || "이미 존재하는 아이디입니다."));
         }
