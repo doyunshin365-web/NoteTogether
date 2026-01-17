@@ -11,13 +11,14 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Nanum+Gothic&family=Nanum+Myeongjo&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
         rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 
 <body>
     <div class="container login">
-        <div class="menu">
-            <img src="./imgs/logo.png" alt="" class="logo">
-        </div>
+        <img src="./imgs/logo.png" alt="" class="logo">
         <p class="title">로그인</p>
         <input type="text" id="id_input" placeholder="ID 입력">
         <input type="password" id="pw_input" placeholder="비밀번호 입력">
@@ -25,10 +26,9 @@
         <p class="hyperlink" id="register_link">계정이 없으십니까?</p>
     </div>
     <div class="container register" style="display: none;">
-        <div class="menu">
-            <img src="./imgs/logo.png" alt="" class="logo">
-        </div>
+        <img src="./imgs/logo.png" alt="" class="logo">
         <p class="title">회원가입</p>
+        <p class="back hyperlink" id="back_to_login" style="cursor: pointer;">로그인으로 돌아가기</p>
         <input type="text" id="id_input_register" placeholder="ID 입력">
         <input type="password" id="pw_input_register" placeholder="비밀번호 입력">
         <button id="register_submit">가입</button>
@@ -37,15 +37,10 @@
         <!-- index 최상위. -->
         <div class="top_menu">
             <img src="./imgs/logo.png" alt="" class="logo">
+            <span class="username" style="color: white; margin-left: 10px; font-weight: bold;"></span>
         </div>
         <div class="menubar">
-            <div class="item active" id="mainmenu_item1">
-                <!-- 아이콘 -->
-                <img src="./svgs/home.svg" alt="">
-                <!-- 라벨 -->
-                <p>홈</p>
-            </div>
-            <div class="item" id="mainmenu_item2">
+            <div class="item active" id="mainmenu_item2">
                 <!-- 아이콘 -->
                 <img src="./svgs/note.svg" alt="">
                 <!-- 라벨 -->
@@ -57,75 +52,89 @@
                 <!-- 라벨 -->
                 <p>워크스페이스</p>
             </div>
-            <div class="item" id="mainmenu_item4">
-                <!-- 아이콘 -->
-                <img src="./svgs/setting.svg" alt="">
-                <!-- 라벨 -->
-                <p>설정</p>
-            </div>
         </div>
-        <div class="menubar_item home">
-            <p class="title">환영합니다, <span class="username" style="color: #2487ac;">유저이름</span>님.</p>
-            <p class="subtitle">최근 변경</p>
-            <div class="recent_changes">
-
-            </div>
-            <p class="subtitle">친구</p>
-            <div class="friends">
-
-            </div>
-            <p class="subtitle">지금 개발자는:</p>
-            <div class="developerNOW">
-
-            </div>
-        </div>
-        <div class="menubar_item note" style="display: none;">
+        <div class="menubar_item note">
             <p class="title">최근 노트</p>
             <div class="add_new_note"><svg xmlns="http://www.w3.org/2000/svg" width="108" height="108"
                     class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
                     <path
                         d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3z" />
                 </svg></div>
-            <!-- <div class="note_item">
-                <p class="note_title">노트 제목</p>
-                <div class="note_editors">
-                    <div class="editor_item">에디터1</div>
-                </div>
-            </div> -->
         </div>
         <div class="menubar_item workspace" style="display: none;">
-            <p class="title">내 워크스페이스</p>
-
-        </div>
-        <div class="menubar_item menu" style="display: none;">
-            <p class="title">전체 메뉴</p>
-            <div class="my_profile">
-                <img src="" alt="" class="profile_pic">
-                <div class="info">
-                    <p class="my_name"></p>
-                    <p class="message"></p>
+            <div id="workspaceHeader"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <p class="title" style="margin-bottom: 0;">내 워크스페이스</p>
+                <div class="add_workspace_btn" id="openCreateWorkspaceModal" title="워크스페이스 생성"
+                    style="cursor: pointer; color: #2487ac;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                        class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
+                        <path
+                            d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3z" />
+                    </svg>
                 </div>
             </div>
-            <div class="menu_item">
-                <img src="" alt="">
-                <p>아이템</p>
+
+            <div id="workspaceInvitationsSection" style="margin-bottom: 20px; display: none;">
+                <p class="subtitle" style="font-size: 13px; color: #666; margin-bottom: 10px;">대기 중인 초대</p>
+                <div id="workspaceInvitationsList"></div>
             </div>
-            <p>Indev Version. 2025. 12. 13.</p>
+
+            <div id="workspaceListSection">
+                <p class="subtitle" style="font-size: 13px; color: #666; margin-bottom: 10px;">참여 중</p>
+                <div id="myWorkspaceList"></div>
+            </div>
+
+            <div class="workspace_detail" id="workspaceDetailView" style="display: none;">
+                <p class="back" id="backToWorkspaceList">내 워크스페이스로 돌아가기</p>
+                <p class="title" id="wsDetailName">이름</p>
+                <p class="subtitle" id="wsDetailDesc">설명</p>
+                <p style="font-size: 14px; color: #555; margin-bottom: 12px; font-weight: 600;">워크스페이스 노트</p>
+                <div id="wsNoteList" class="ws-note-list"
+                    style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 24px; scrollbar-width: thin; border-bottom: 1px solid #f0f0f0;">
+                    <!-- 노트 아이템들이 여기에 동적으로 추가됨 -->
+                </div>
+
+                <p style="font-size: 14px; color: #555; margin-bottom: 12px; font-weight: 600;">멤버</p>
+                <div class="members" id="wsDetailMembers">
+                    <!-- <p class="member">멤버</p> -->
+                </div>
+                <div class="buttons">
+                    <button id="leaveWorkspaceBtn">탈퇴</button>
+                    <button id="inviteToWorkspaceBtn">초대</button>
+                </div>
+            </div>
         </div>
     </div>
     <div class="container editor_main" style="display: none;">
         <div class="editor_menu">
             <div class="editor_header">
+                <div class="menu_item back_item" id="backToHomeBtn">뒤로</div>
                 <div class="menu_item home_item">홈</div>
                 <div class="menu_item add_item">삽입</div>
                 <div class="menu_item AI_item">AI</div>
-                <div class="menu_item help_item">도움말</div>
+                <div class="menu_item help_item" id="helpToggleBtn">도움말</div>
             </div>
             <div class="menu_content">
                 <div class="menu_item_content home_content">
                     <div class="menu_button" id="memberToggleBtn">멤버</div>
-                    <div class="menu_button" id="saveNoteBtn">저장</div>
-                    <div class="menu_button">붙여넣기</div>
+                    <div class="menu_button dropdown-container" id="saveMenuBtn">
+                        저장
+                        <div class="dropdown-menu">
+                            <div class="dropdown-item" id="onlineSaveBtn">온라인 저장</div>
+                            <div class="dropdown-item" id="pdfSaveBtn">PDF 저장</div>
+                            <div class="dropdown-item" id="wordSaveBtn">Word 저장</div>
+                            <div class="dropdown-item" id="ntSaveBtn">NT 저장</div>
+                        </div>
+                    </div>
+                    <div class="menu_button dropdown-container" id="loadMenuBtn">
+                        불러오기
+                        <div class="dropdown-menu">
+                            <div class="dropdown-item" id="onlineLoadBtn">온라인 문서 불러오기</div>
+                            <div class="dropdown-item" id="localLoadBtn">로컬 문서 불러오기</div>
+                        </div>
+                    </div>
+                    <div class="menu_button" id="pasteBtn">붙여넣기</div>
                     <select name="fontSelect" id="fontSelect" class="nh_menu_button" style="width: 190px;">
                         <option value="default">시스템</option>
                         <option value="'Noto Sans KR'">Noto Sans KR</option>
@@ -151,17 +160,17 @@
                         <option value="48px">48</option>
                         <option value="72px">72</option>
                     </select>
-                    <div class="menu_button" style="width: 10px; font-weight: bold;">T</div>
-                    <div class="menu_button" style="width: 10px; font-style: italic;">T</div>
-                    <div class="menu_button" style="width: 10px; text-decoration: line-through;">T</div>
-                    <div class="menu_button" style="width: 10px; color: black;">C</div>
+                    <div class="menu_button" id="boldBtn" style="width: 10px; font-weight: bold;">T</div>
+                    <div class="menu_button" id="italicBtn" style="width: 10px; font-style: italic;">T</div>
+                    <div class="menu_button" id="strikeBtn" style="width: 10px; text-decoration: line-through;">T</div>
+                    <div class="menu_button" id="colorBtn" style="width: 10px; color: black;">C</div>
                 </div>
                 <div class="menu_item_content add_content">
-                    <div class="menu_button">표</div>
-                    <div class="menu_button">이미지</div>
-                    <div class="menu_button">도형</div>
-                    <div class="menu_button">링크</div>
-                    <div class="menu_button">워터마크</div>
+                    <div class="menu_button" id="insertTableBtn">표</div>
+                    <div class="menu_button" id="insertImageBtn">이미지</div>
+                    <div class="menu_button" id="insertShapeBtn">도형</div>
+                    <div class="menu_button" id="insertLinkBtn">링크</div>
+                    <div class="menu_button" id="insertWatermarkBtn">워터마크</div>
                 </div>
                 <div class="menu_item_content AI_content">
                     <input type="text" id="aiInstructionInput" style="width: 500px;" class="nh_menu_button"
@@ -234,7 +243,7 @@
         <div class="sidebar-body">
             <div style="margin-bottom: 20px;">
                 <p style="font-size: 14px; color: #555; margin-bottom: 10px;">멤버 추가:</p>
-                <div style="display: flex; gap: 8px;">
+                <div style="display: block; gap: 8px;">
                     <input type="text" id="addMemberInput" placeholder="사용자 ID 입력"
                         style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
                     <button id="addMemberBtn"
@@ -257,16 +266,111 @@
     <!-- 정보 사이드바 -->
     <div id="infoSidebar" class="right-sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-title">노트투게더</span>
+            <span class="sidebar-title">정보</span>
             <button class="close-sidebar-btn" id="closeInfoSidebarBtn">&times;</button>
         </div>
         <div class="sidebar-body">
-            <img src="./imgs/logo.png" alt="" class="logo">
-            <p style="margin-bottom: 20px; font-size: 14px; color: #555;">노트투게더 0.5</p>
-            <p>Indev Version. 2025. 12. 13.</p>
-            <p>ⓒ2025</p>
+            <div style="padding: 20px; text-align: center;">
+                <img src="./imgs/logo.png" alt="NoteTogether" style="width: 100px; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">NoteTogether</h3>
+                <p style="font-size: 14px; color: #666; line-height: 1.6;">
+                    실시간 협업과 스마트한 문서 관리를 위한<br>
+                    올인원 노트 플랫폼입니다.
+                </p>
+                <div
+                    style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999;">
+                    Version 1.0.0<br>
+                    &copy; 2026 NoteTogether Team
+                </div>
+            </div>
         </div>
     </div>
+    <!-- 워크스페이스 생성 모달 -->
+    <div id="createWorkspaceModal" class="modal"
+        style="display: none; position: fixed; z-index: 10002; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <p class="title" style="font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #2487ac;">새 워크스페이스
+                생성</p>
+            <input type="text" id="workspaceNameInput" placeholder="워크스페이스 이름"
+                style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button id="cancelWorkspaceBtn"
+                    style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; color: #555; width: auto; margin-top: 0; font-size: 14px; height: 40px;">취소</button>
+                <button id="submitWorkspaceBtn"
+                    style="padding: 10px 20px; background: #2487ac; color: white; border: none; border-radius: 4px; cursor: pointer; width: auto; margin-top: 0; font-size: 14px; height: 40px;">생성하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 워크스페이스 멤버 초대 모달 -->
+    <div id="inviteMemberModal" class="modal"
+        style="display: none; position: fixed; z-index: 10002; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <p class="title" style="font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #2487ac;">멤버 초대</p>
+            <p id="targetWorkspaceName" style="font-size: 14px; color: #666; margin-bottom: 10px;"></p>
+            <input type="text" id="targetUserIdInput" placeholder="초대할 사용자 ID"
+                style="width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button id="cancelInviteBtn"
+                    style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; color: #555; width: auto; margin-top: 0; font-size: 14px; height: 40px;">취소</button>
+                <button id="submitInviteBtn"
+                    style="padding: 10px 20px; background: #2487ac; color: white; border: none; border-radius: 4px; cursor: pointer; width: auto; margin-top: 0; font-size: 14px; height: 40px;">초대하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 노트 생성 시 워크스페이스 선택 모달 -->
+    <div id="createNoteWithWorkspaceModal" class="modal"
+        style="display: none; position: fixed; z-index: 10002; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="background: white; padding: 25px; border-radius: 8px; width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <p class="title" style="font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #2487ac;">새 노트 생성
+            </p>
+            <input type="text" id="noteTitleInput" placeholder="노트 제목"
+                style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+
+            <p style="font-size: 14px; color: #555; margin-bottom: 8px;">소속 워크스페이스 (선택):</p>
+            <select id="noteWorkspaceSelect"
+                style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="">(없음)</option>
+            </select>
+
+            <div id="inviteAllOption" style="display: none; align-items: center; gap: 8px; margin-bottom: 20px;">
+                <input type="checkbox" id="inviteAllCheckbox">
+                <label for="inviteAllCheckbox" style="font-size: 14px; color: #555;">워크스페이스의 모든 멤버 초대</label>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
+                <button id="cancelCreateNoteBtn"
+                    style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; color: #555; width: auto; margin-top: 0; font-size: 14px; height: 40px;">취소</button>
+                <button id="submitCreateNoteBtn"
+                    style="padding: 10px 20px; background: #2487ac; color: white; border: none; border-radius: 4px; cursor: pointer; width: auto; margin-top: 0; font-size: 14px; height: 40px;">생성하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 온라인 불러오기 모달 -->
+    <div id="onlineLoadModal" class="modal"
+        style="display: none; position: fixed; z-index: 10005; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="background: white; padding: 25px; border-radius: 8px; width: 500px; max-height: 80%; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <p class="title" style="font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #2487ac;">온라인 문서
+                불러오기</p>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">불러올 문서를 선택하세요. 현재 편집 중인 내용은 유실될 수 있습니다.</p>
+            <div id="onlineLoadList" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- 노트 목록 동적 추가 -->
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button id="cancelOnlineLoadBtn"
+                    style="padding: 10px 20px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; color: #555;">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 숨겨진 파일 입력 (로컬 불러오기용) -->
+    <input type="file" id="localFileInput" style="display: none;" accept=".nt">
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="./scripts/app.js"></script>

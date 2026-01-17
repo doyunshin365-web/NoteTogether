@@ -1,3 +1,95 @@
+@media print {
+
+  .editor_header,
+  .editor_menu,
+  .side_menu,
+  .menubar,
+  .main_menu_header,
+  .menubar_item,
+  .main_menu_tabs {
+    display: none !important;
+  }
+
+  .editor_main {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .content {
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+
+/* =============== 드롭다운 메뉴 =============== */
+.dropdown-container {
+  position: relative;
+  overflow: visible !important;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  min-width: 220px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  z-index: 2000;
+  border: 1px solid #e1dfdd;
+  padding: 8px 0;
+  margin-top: 2px;
+}
+
+.dropdown-container:hover .dropdown-menu {
+  display: block;
+}
+
+.dropdown-item {
+  padding: 12px 20px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.dropdown-item:hover {
+  background: #f3f2f1;
+  color: #2487ac;
+}
+
+/* 온라인 불러오기 리스트 아이템 */
+.load-note-item {
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.load-note-item:hover {
+  border-color: #2487ac;
+  background: #f0f8ff;
+}
+
+.load-note-item .note-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.load-note-item .note-meta {
+  font-size: 11px;
+  color: #999;
+}
+
 /* =============== 공통 세팅 =============== */
 html,
 body {
@@ -10,15 +102,62 @@ body {
 body {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  background: #f3f3f3;
-  /* Light gray desk background */
+  align-items: center;
+  /* Vertically center login form */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  /* Premium Gradient */
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 /* =============== 컨테이너 =============== */
 .login,
 .register {
-  width: 420px !important;
+  width: 450px !important;
+  height: auto !important;
+  padding: 50px 40px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  /* Glass effect */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white !important;
+  animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.login .logo,
+.register .logo {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Main App Container Override */
+.main_menu,
+.editor_main {
+  background-color: #f8f9fa !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  display: block;
 }
 
 .container {
@@ -39,9 +178,20 @@ body {
 /* =============== 텍스트 =============== */
 .title {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 800;
+  /* Bold */
+  color: white;
+  /* Glass text */
+  margin: 20px 0 10px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.main_menu .title,
+.editor_main .title {
   color: #222831;
+  /* Restore dark text for main app */
   margin: 30px 0 20px;
+  text-shadow: none;
 }
 
 .main_menu .title {
@@ -73,43 +223,67 @@ body {
 input[type="text"],
 input[type="password"] {
   width: 100%;
-  padding: 14px 4px 10px;
-  font-size: 18px;
+  padding: 15px 20px;
+  font-size: 16px;
   border: none;
-  border-bottom: 2px solid #d0d7e2;
-  background: none;
-  color: #222;
-  margin-top: 20px;
+  border-radius: 50px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  margin-top: 15px;
   box-sizing: border-box;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 input::placeholder {
-  color: #9ca4b0;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 input:hover {
-  border-bottom-color: #b0b8c1;
+  background: rgba(255, 255, 255, 0.25);
 }
 
 input:focus {
-  border-bottom: 2px solid #2487ac;
+  background: rgba(255, 255, 255, 0.3);
   outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  transform: scale(1.02);
+}
+
+/* Override for Main App inputs to look standard */
+.main_menu input,
+.modal input {
+  background: white;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.main_menu input:focus,
+.modal input:focus {
+  border-color: #2487ac;
+  box-shadow: 0 0 0 2px rgba(36, 135, 172, 0.2);
+  background: white;
+  transform: none;
 }
 
 button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn) {
   width: 100%;
-  padding: 16px 0;
+  padding: 18px 0;
   margin-top: 30px;
-  background: #2487ac;
+  background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+  /* Vibrant Gradient */
   color: white;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   border: none;
-  border-radius: 25px;
+  border-radius: 50px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   box-sizing: border-box;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
 button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button):not(.ribbon_design button):not(.ribbon_insert button):not(.ribbon_layout button):not(.ribbon_view button):not(.close-sidebar-btn):hover {
@@ -298,6 +472,276 @@ button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button)
 .friend_table .message {
   font-size: 12px;
   color: #777;
+}
+
+/* =============== 워크스페이스 & 초대 아이템 =============== */
+.workspace-item,
+.invitation-item {
+  background: white;
+  padding: 18px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  border: 1px solid #eef0f3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.workspace-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(36, 135, 172, 0.12);
+  border-color: #a8d4e6;
+}
+
+.workspace-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-name {
+  font-weight: 700;
+  font-size: 18px;
+  color: #222831;
+}
+
+.workspace-meta {
+  font-size: 12px;
+  color: #88929d;
+}
+
+.invite-btn {
+  background: #f0f7fa;
+  border: 1px solid #d4e8f1;
+  color: #2487ac;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.invite-btn:hover {
+  background: #2487ac;
+  color: white;
+  border-color: #2487ac;
+  box-shadow: 0 4px 8px rgba(36, 135, 172, 0.2);
+}
+
+.invitation-item {
+  background: #fffafa;
+  border: 1px solid #ffebe0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.invitation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invitation-badge {
+  background: #ff6b6b;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.invitation-text {
+  font-size: 14px;
+  color: #444;
+}
+
+.invitation-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.invitation-actions button {
+  flex: 1;
+  padding: 10px;
+  margin-top: 0 !important;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.btn-accept {
+  background: #2487ac !important;
+}
+
+.btn-decline {
+  background: #9ca4b0 !important;
+}
+
+/* =============== 워크스페이스 상세 보기 =============== */
+.workspace_detail {
+  padding: 20px 0;
+}
+
+.workspace_detail .back {
+  font-size: 14px;
+  color: #2487ac;
+  cursor: pointer;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  transition: opacity 0.2s ease;
+}
+
+.workspace_detail .back:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
+.workspace_detail .back::before {
+  content: "←";
+  font-size: 18px;
+}
+
+.workspace_detail .title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222831;
+  margin: 0 0 8px 0;
+}
+
+.workspace_detail .subtitle {
+  font-size: 14px;
+  color: #88929d;
+  margin: 0 0 32px 0;
+}
+
+.workspace_detail .members {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 32px;
+}
+
+.workspace_detail .member-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.workspace_detail .member-item:last-child {
+  border-bottom: none;
+}
+
+.workspace_detail .member-avatar {
+  width: 32px;
+  height: 32px;
+  background: #2487ac;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workspace_detail .member-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace_detail .member-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #222831;
+}
+
+.workspace_detail .member-status {
+  font-size: 12px;
+  color: #88929d;
+}
+
+.workspace_detail .buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.workspace_detail .buttons button {
+  flex: 1;
+  margin-top: 0 !important;
+  padding: 14px 0;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.workspace_detail #leaveWorkspaceBtn {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+}
+
+.workspace_detail #leaveWorkspaceBtn:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.ws-note-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ws-note-list::-webkit-scrollbar-thumb {
+  background: #d0d7e2;
+  border-radius: 10px;
+}
+
+.ws-note-card {
+  min-width: 160px;
+  max-width: 160px;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #eef0f3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100px;
+}
+
+.ws-note-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(36, 135, 172, 0.12);
+  border-color: #a8d4e6;
+}
+
+.ws-note-card .note-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #222831;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ws-note-card .note-date {
+  font-size: 11px;
+  color: #88929d;
 }
 
 /* =============== 메뉴 아이템 =============== */
@@ -568,8 +1012,9 @@ button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button)
   box-shadow: none;
   /* Remove shadow */
   position: relative;
-  overflow: hidden;
-  z-index: 0;
+  overflow: visible;
+  /* Change from hidden to allow dropdowns */
+  z-index: 1;
 }
 
 .nh_menu_button {
@@ -633,12 +1078,14 @@ button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button)
   /* Light gray toolbar background */
   display: flex;
   border-bottom: 1px solid #e1dfdd;
+  overflow: visible;
 }
 
 .menu_item_content {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  overflow: visible;
 }
 
 /* =============== 컬러 피커 =============== */
@@ -779,6 +1226,13 @@ button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button)
   right: 0;
 }
 
+/* 멤버 사이드바(왼쪽일 경우 대비해서 추가 확인했으나 여기선 오른쪽인듯) */
+#memberSidebar.open,
+#rightSidebar.open,
+#infoSidebar.open {
+  right: 0;
+}
+
 .sidebar-header {
   padding: 16px 20px;
   display: flex;
@@ -902,4 +1356,138 @@ button:not(.ribbonmenu button):not(.ribbon_file button):not(.ribbon_home button)
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* === Recent Notes UI 개편 === */
+.note_container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.note_item {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+}
+
+.note_item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #2487ac;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.note_item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px rgba(36, 135, 172, 0.12);
+  border-color: rgba(36, 135, 172, 0.2);
+}
+
+.note_item:hover::before {
+  opacity: 1;
+}
+
+.note_title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note_summary {
+  font-size: 14px;
+  color: #7f8c8d;
+  line-height: 1.5;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.note_footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f5f5f5;
+  padding-top: 12px;
+}
+
+.note_editors {
+  display: flex;
+  flex-direction: row;
+  margin-left: 8px;
+}
+
+.editor_badge {
+  width: 24px;
+  height: 24px;
+  background: #2487ac;
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-left: -8px;
+}
+
+/* 추가 버튼 디자인 개선 */
+.add_new_note {
+  grid-column: 1 / -1;
+  background: #f8f9fa;
+  border: 2px dashed #d1d8dd;
+  border-radius: 12px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.add_new_note:hover {
+  background: rgba(36, 135, 172, 0.05);
+  border-color: #2487ac;
+  transform: scale(1.01);
+}
+
+.add_new_note svg {
+  fill: #2487ac;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 10px;
+}
+
+.add_new_note::after {
+  content: '새 노트 작성하기';
+  font-size: 16px;
+  font-weight: 600;
+  color: #2487ac;
 }

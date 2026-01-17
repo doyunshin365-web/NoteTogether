@@ -6,6 +6,7 @@ const http = require("http");
 const cors = require("cors");
 const User = require("./docs/models/user");
 const Note = require("./docs/models/note");
+const Workspace = require("./docs/models/workspace");
 const { Mistral } = require("@mistralai/mistralai");
 require("dotenv").config();
 
@@ -82,17 +83,33 @@ app.post("/login", async (req, res) => {
 // === Note Routes ===
 
 app.post("/create_note", async (req, res) => {
-  const { title, userId } = req.body;
+  const { title, userId, workspaceId, inviteAll } = req.body;
 
   if (!title || !userId) {
     return res.status(400).json({ message: "-1", error: "Missing title or user" });
   }
 
   try {
+    let editors = [userId];
+
+    // 워크스페이스 멤버 일괄 초대 옵션이 켜져 있고 워크스페이스 ID가 있는 경우
+    if (workspaceId && inviteAll) {
+      const workspace = await Workspace.findById(workspaceId);
+      if (workspace) {
+        const acceptedMembers = workspace.members
+          .filter(m => m.status === 'accepted')
+          .map(m => m.userId);
+
+        // 중복 제거 및 에디터 추가
+        editors = Array.from(new Set([...editors, ...acceptedMembers]));
+      }
+    }
+
     const newNote = new Note({
       title,
       contents: "",
-      editors: [userId]
+      editors,
+      workspaceId: workspaceId || null
     });
 
     await newNote.save();
@@ -172,6 +189,108 @@ app.post("/add_member", async (req, res) => {
   }
 });
 
+// === Workspace Routes ===
+
+app.post("/create_workspace", async (req, res) => {
+  const { name, ownerId } = req.body;
+
+  if (!name || !ownerId) {
+    return res.status(400).json({ message: "-1", error: "Missing name or ownerId" });
+  }
+
+  try {
+    const workspace = new Workspace({
+      name,
+      owner: ownerId,
+      members: [{ userId: ownerId, status: 'accepted' }]
+    });
+
+    await workspace.save();
+    res.json({ message: "1", workspace });
+  } catch (err) {
+    console.error("Create Workspace Error:", err);
+    res.status(500).json({ message: "-1", error: "Server error" });
+  }
+});
+
+app.post("/get_workspaces", async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    // 사용자가 멤버로 포함되어 있고 (상태 상관없이) 조회
+    const workspaces = await Workspace.find({ "members.userId": userId });
+    res.json({ message: "1", workspaces });
+  } catch (err) {
+    console.error("Get Workspaces Error:", err);
+    res.status(500).json({ message: "-1", error: "Server error" });
+  }
+});
+
+app.post("/invite_to_workspace", async (req, res) => {
+  const { workspaceId, targetUserId } = req.body;
+
+  try {
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) return res.status(404).json({ message: "-1", error: "Workspace not found" });
+
+    // 이미 멤버인지 확인
+    if (workspace.members.some(m => m.userId === targetUserId)) {
+      return res.status(400).json({ message: "-1", error: "Already a member" });
+    }
+
+    workspace.members.push({ userId: targetUserId, status: 'pending' });
+    await workspace.save();
+
+    // 실시간 알림 전송 (상대방이 접속 중인 경우)
+    const targetSocketId = userSockets.get(targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("workspace-invite", {
+        workspaceId: workspace._id,
+        name: workspace.name
+      });
+    }
+
+    res.json({ message: "1" });
+  } catch (err) {
+    console.error("Invite Error:", err);
+    res.status(500).json({ message: "-1", error: "Server error" });
+  }
+});
+
+app.post("/respond_to_invitation", async (req, res) => {
+  const { workspaceId, userId, response } = req.body; // response: 'accepted' or 'declined'
+
+  try {
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) return res.status(404).json({ message: "-1", error: "Workspace not found" });
+
+    const memberIndex = workspace.members.findIndex(m => m.userId === userId);
+    if (memberIndex === -1) return res.status(400).json({ message: "-1", error: "Not invited" });
+
+    workspace.members[memberIndex].status = response;
+    await workspace.save();
+
+    res.json({ message: "1" });
+  } catch (err) {
+    console.error("Respond Error:", err);
+    res.status(500).json({ message: "-1", error: "Server error" });
+  }
+});
+
+app.post("/get_workspace_details", async (req, res) => {
+  const { workspaceId } = req.body;
+
+  try {
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) return res.status(404).json({ message: "-1", error: "Workspace not found" });
+
+    res.json({ message: "1", workspace });
+  } catch (err) {
+    console.error("Details Error:", err);
+    res.status(500).json({ message: "-1", error: "Server error" });
+  }
+});
+
 // === AI Proofread Route ===
 
 app.post("/ai-proofread", async (req, res) => {
@@ -208,9 +327,16 @@ app.post("/ai-proofread", async (req, res) => {
 
 // === Socket.io for Real-time Collaboration ===
 const activeUsers = new Map();
+const userSockets = new Map(); // userId -> socketId
 
 io.on("connection", (socket) => {
   console.log("New client connected: " + socket.id);
+
+  // 사용자 등록 (실시간 알림용)
+  socket.on("register-user", (userId) => {
+    userSockets.set(userId, socket.id);
+    console.log(`User registered for notifications: ${userId} (${socket.id})`);
+  });
 
   // 노트 방에 참여
   socket.on("join-note", ({ noteId, userId }) => {
@@ -266,6 +392,15 @@ io.on("connection", (socket) => {
   // 연결 해제
   socket.on("disconnect", () => {
     console.log("Client disconnected: " + socket.id);
+
+    // userSockets에서 제거 (실시간 알림용)
+    for (const [uid, sid] of userSockets.entries()) {
+      if (sid === socket.id) {
+        userSockets.delete(uid);
+        console.log(`User unregistered for notifications: ${uid}`);
+        break;
+      }
+    }
 
     for (const [noteId, users] of activeUsers.entries()) {
       const userIndex = users.findIndex(u => u.socketId === socket.id);

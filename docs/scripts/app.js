@@ -10,16 +10,47 @@ let home_item = document.querySelector('#mainmenu_item1');
 let note_item = document.querySelector('#mainmenu_item2');
 let friends_item = document.querySelector('#mainmenu_item3');
 let menu_item = document.querySelector('#mainmenu_item4');
-let register_link = document.querySelector('#register_link');
 let register_btn = document.querySelector('#register_submit');
+const addNewNoteBtn = document.querySelector('.add_new_note');
+
+// === Cookie Helpers === //
+function setCookie(name, value, days) {
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toGMTString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
 
 // 전역 변수: 로그인한 사용자 ID (메모리에 저장)
 let loggedInUserId = null;
+let currentWorkspaces = [];
+let currentInvitations = [];
+let currentNotes = [];
 
 
 register_link.addEventListener('click', () => {
     login_div.style.display = 'none';
-    register_div.style.display = 'block'; // Make sure this matches CSS (flex/block)
+    register_div.style.display = 'flex';
+});
+
+document.getElementById('back_to_login').addEventListener('click', () => {
+    register_div.style.display = 'none';
+    login_div.style.display = 'flex';
 });
 
 register_btn.addEventListener('click', async () => {
@@ -43,7 +74,7 @@ register_btn.addEventListener('click', async () => {
         if (data.message === "1") {
             alert("회원가입 성공! 로그인 해주세요.");
             register_div.style.display = 'none';
-            login_div.style.display = 'block'; // Or flex, checking css but standard block/flex toggle
+            login_div.style.display = 'flex';
         } else {
             alert("회원가입 실패: " + (data.error || "이미 존재하는 아이디입니다."));
         }
@@ -53,21 +84,16 @@ register_btn.addEventListener('click', async () => {
     }
 });
 
-login_btn.addEventListener('click', async () => {
-    const id = document.querySelector('#id_input').value;
-    const pw = document.querySelector('#pw_input').value;
-
+async function performLogin(id, pw, isAuto = false) {
     if (!id || !pw) {
-        alert("아이디와 비밀번호를 입력해주세요.");
+        if (!isAuto) alert("아이디와 비밀번호를 입력해주세요.");
         return;
     }
 
     try {
         const response = await fetch('/login', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, pw }),
         });
 
@@ -78,68 +104,126 @@ login_btn.addEventListener('click', async () => {
             login_div.style.display = 'none';
             main_div.style.display = 'block';
 
-            // 사용자 정보 저장 (필요시)
             localStorage.setItem('user_id', id);
             localStorage.setItem('user_desc', data.desc);
-            // 프로필 이미지 등 UI 업데이트 로직 추가 가능
-            document.querySelector('.username').textContent = id;
-        } else if (data.message === "-1") {
-            alert("존재하지 않는 아이디입니다.");
-        } else if (data.message === "-2") {
-            alert("비밀번호가 일치하지 않습니다.");
+            loggedInUserId = id;
+
+            const usernameEl = document.querySelector('.username');
+            if (usernameEl) usernameEl.textContent = id;
+
+            // 쿠키 저장 (id, pw, timestamp)
+            setCookie('auto_login_id', id, 365);
+            setCookie('auto_login_pw', pw, 365);
+            setCookie('auto_login_time', Date.now(), 365);
+
+            initializeSocket();
+            loadUserNotes();
+            loadWorkspaces();
+            loadInvitations();
+            return true;
         } else {
-            alert("로그인 오류가 발생했습니다.");
+            if (!isAuto) {
+                if (data.message === "-1") alert("존재하지 않는 아이디입니다.");
+                else if (data.message === "-2") alert("비밀번호가 일치하지 않습니다.");
+                else alert("로그인 오류가 발생했습니다.");
+            }
+            return false;
         }
     } catch (error) {
         console.error("Login Error:", error);
-        alert("서버와 통신 중 오류가 발생했습니다.");
+        if (!isAuto) alert("서버와 통신 중 오류가 발생했습니다.");
+        return false;
+    }
+}
+
+login_btn.addEventListener('click', async () => {
+    const id = document.querySelector('#id_input').value;
+    const pw = document.querySelector('#pw_input').value;
+    await performLogin(id, pw);
+});
+
+// Auto-login on load
+window.addEventListener('DOMContentLoaded', async () => {
+    const savedId = getCookie('auto_login_id');
+    const savedPw = getCookie('auto_login_pw');
+    const savedTime = getCookie('auto_login_time');
+
+    if (savedId && savedPw && savedTime) {
+        const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const diff = now - parseInt(savedTime);
+
+        if (diff < oneYearInMs) {
+            console.log("Attempting auto-login...");
+            const success = await performLogin(savedId, savedPw, true);
+            if (!success) {
+                console.log("Auto-login failed. Please login manually.");
+            }
+        } else {
+            console.log("Auto-login expired (1 year). Please login manually.");
+        }
     }
 });
 
-home_item.addEventListener('click', () => {
-    home.style.display = 'block';
-    note.style.display = 'none';
-    friends.style.display = 'none';
-    menu.style.display = 'none';
-    home_item.classList.remove('active');
-    note_item.classList.remove('active');
-    friends_item.classList.remove('active');
-    menu_item.classList.remove('active');
-    home_item.classList.add('active');
-});
-note_item.addEventListener('click', () => {
-    home.style.display = 'none';
-    note.style.display = 'block';
-    friends.style.display = 'none';
-    menu.style.display = 'none';
-    home_item.classList.remove('active');
-    note_item.classList.remove('active');
-    friends_item.classList.remove('active');
-    menu_item.classList.remove('active');
-    note_item.classList.add('active');
-});
-friends_item.addEventListener('click', () => {
-    home.style.display = 'none';
-    note.style.display = 'none';
-    friends.style.display = 'block';
-    menu.style.display = 'none';
-    home_item.classList.remove('active');
-    note_item.classList.remove('active');
-    friends_item.classList.remove('active');
-    menu_item.classList.remove('active');
-    friends_item.classList.add('active');
-});
-menu_item.addEventListener('click', () => {
-    home.style.display = 'none';
-    note.style.display = 'none';
-    friends.style.display = 'none';
-    menu.style.display = 'block';
-    home_item.classList.remove('active');
-    note_item.classList.remove('active');
-    friends_item.classList.remove('active');
-    menu_item.classList.remove('active');
-    menu_item.classList.add('active');
-});
+function safeDisplay(element, value) {
+    if (element) element.style.display = value;
+}
+
+if (home_item) {
+    home_item.addEventListener('click', () => {
+        safeDisplay(home, 'block');
+        safeDisplay(note, 'none');
+        safeDisplay(friends, 'none');
+        safeDisplay(menu, 'none');
+
+        if (home_item) home_item.classList.add('active');
+        if (note_item) note_item.classList.remove('active');
+        if (friends_item) friends_item.classList.remove('active');
+        if (menu_item) menu_item.classList.remove('active');
+    });
+}
+
+if (note_item) {
+    note_item.addEventListener('click', () => {
+        safeDisplay(home, 'none');
+        safeDisplay(note, 'block');
+        safeDisplay(friends, 'none');
+        safeDisplay(menu, 'none');
+
+        if (home_item) home_item.classList.remove('active');
+        if (note_item) note_item.classList.add('active');
+        if (friends_item) friends_item.classList.remove('active');
+        if (menu_item) menu_item.classList.remove('active');
+    });
+}
+
+if (friends_item) {
+    friends_item.addEventListener('click', () => {
+        safeDisplay(home, 'none');
+        safeDisplay(note, 'none');
+        safeDisplay(friends, 'block');
+        safeDisplay(menu, 'none');
+
+        if (home_item) home_item.classList.remove('active');
+        if (note_item) note_item.classList.remove('active');
+        if (friends_item) friends_item.classList.add('active');
+        if (menu_item) menu_item.classList.remove('active');
+    });
+}
+
+if (menu_item) {
+    menu_item.addEventListener('click', () => {
+        safeDisplay(home, 'none');
+        safeDisplay(note, 'none');
+        safeDisplay(friends, 'none');
+        safeDisplay(menu, 'block');
+
+        if (home_item) home_item.classList.remove('active');
+        if (note_item) note_item.classList.remove('active');
+        if (friends_item) friends_item.classList.remove('active');
+        if (menu_item) menu_item.classList.add('active');
+    });
+}
 
 // === 리본 메뉴 탭 전환 === //
 const headerItems = document.querySelectorAll('.editor_header .menu_item');
@@ -242,142 +326,136 @@ function insertHTMLAtCursor(html) {
 }
 
 // === 버튼 기능 예시 === //
-document.querySelectorAll('.menu_button').forEach(btn => {
-    // 스타일 버튼들(T, C)은 제외
-    const text = btn.innerText.trim();
-    if (text === 'T' || text === 'C') {
-        return;
-    }
+const pasteBtn = document.getElementById('pasteBtn');
+if (pasteBtn) {
+    pasteBtn.addEventListener('click', () => {
+        navigator.clipboard.readText().then(text => {
+            insertTextAtCursor(text);
+        }).catch(err => {
+            console.error('클립보드 읽기 실패:', err);
+            alert('클립보드 접근에 실패했습니다.');
+        });
+    });
+}
 
-    btn.addEventListener('click', () => {
-        const action = btn.innerText.trim();
-
-        if (action === "붙여넣기") {
-            navigator.clipboard.readText().then(text => {
-                insertTextAtCursor(text);
-            }).catch(err => {
-                console.error('클립보드 읽기 실패:', err);
-                alert('클립보드 접근에 실패했습니다.');
-            });
-        }
-
-
-        if (action === "이미지") {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = `<img src="${event.target.result}" style="max-width: 100%; height: auto;" /><br>`;
-                        insertHTMLAtCursor(img);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-            input.click();
-        }
-
-        if (action === "도형") {
-            const shapeType = prompt("삽입할 도형을 선택하세요 (1: 사각형, 2: 원, 3: 삼각형):", "1");
-            let shapeSVG = "";
-            let shapeStyle = "width: 100px; height: 100px;"; // Default size
-
-            if (shapeType === "1") {
-                // 사각형
-                shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><rect width="100" height="100" style="fill:#2487ac; stroke-width:0;" /></svg>`;
-            } else if (shapeType === "2") {
-                // 원
-                shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><circle cx="50" cy="50" r="50" style="fill:#e04f5f; stroke-width:0;" /></svg>`;
-            } else if (shapeType === "3") {
-                // 삼각형
-                shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><polygon points="50,0 100,100 0,100" style="fill:#66cc66; stroke-width:0;" /></svg>`;
+const insertImageBtn = document.getElementById('insertImageBtn');
+if (insertImageBtn) {
+    insertImageBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = `<img src="${event.target.result}" style="max-width: 100%; height: auto;" /><br>`;
+                    insertHTMLAtCursor(img);
+                };
+                reader.readAsDataURL(file);
             }
+        };
+        input.click();
+    });
+}
 
-            if (shapeSVG) {
-                // Wrapper with resize handle
-                const wrapperHTML = `<div class="shape-container" contenteditable="false" style="${shapeStyle}">${shapeSVG}<div class="resize-handle"></div></div>&nbsp;`;
-                insertHTMLAtCursor(wrapperHTML);
-            }
+const insertShapeBtn = document.getElementById('insertShapeBtn');
+if (insertShapeBtn) {
+    insertShapeBtn.addEventListener('click', () => {
+        const shapeType = prompt("삽입할 도형을 선택하세요 (1: 사각형, 2: 원, 3: 삼각형):", "1");
+        let shapeSVG = "";
+        let shapeStyle = "width: 100px; height: 100px;"; // Default size
+
+        if (shapeType === "1") {
+            shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><rect width="100" height="100" style="fill:#2487ac; stroke-width:0;" /></svg>`;
+        } else if (shapeType === "2") {
+            shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><circle cx="50" cy="50" r="50" style="fill:#e04f5f; stroke-width:0;" /></svg>`;
+        } else if (shapeType === "3") {
+            shapeSVG = `<svg viewBox="0 0 100 100" style="width:100%; height:100%; display:block;"><polygon points="50,0 100,100 0,100" style="fill:#66cc66; stroke-width:0;" /></svg>`;
         }
 
-        if (action === "링크") {
-            const url = prompt("링크 입력!");
-            if (url) {
-                focusEditor();
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                    const range = selection.getRangeAt(0);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.textContent = selection.toString();
-                    link.target = '_blank';
-                    range.deleteContents();
-                    range.insertNode(link);
-                } else {
-                    const linkText = prompt("링크 텍스트 입력:");
-                    if (linkText) {
-                        const link = `<a href="${url}" target="_blank">${linkText}</a> `;
-                        insertHTMLAtCursor(link);
-                    }
-                }
-            }
-        }
-
-        if (action === "표") {
-            const rows = prompt("행 개수 입력:", "2");
-            const cols = prompt("열 개수 입력:", "2");
-            if (rows && cols) {
-                let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;"><tbody>';
-                for (let i = 0; i < parseInt(rows); i++) {
-                    tableHTML += '<tr>';
-                    for (let j = 0; j < parseInt(cols); j++) {
-                        tableHTML += '<td style="padding: 8px;">&nbsp;</td>';
-                    }
-                    tableHTML += '</tr>';
-                }
-                tableHTML += '</tbody></table><br>';
-                insertHTMLAtCursor(tableHTML);
-            }
-        }
-
-        if (action === "워터마크") {
-            const wmText = prompt("워터마크로 사용할 텍스트를 입력하세요:", "CONFIDENTIAL");
-            if (wmText) {
-                // 기존 워터마크 삭제
-                const oldWm = editor.querySelector('.watermark-overlay');
-                if (oldWm) oldWm.remove();
-
-                const wmDiv = document.createElement('div');
-                wmDiv.className = 'watermark-overlay';
-                wmDiv.style.position = 'absolute';
-                wmDiv.style.top = '50%';
-                wmDiv.style.left = '50%';
-                wmDiv.style.transform = 'translate(-50%, -50%) rotate(-45deg)';
-                wmDiv.style.fontSize = '80px';
-                wmDiv.style.color = 'rgba(0, 0, 0, 0.05)';
-                wmDiv.style.pointerEvents = 'none'; // 편집 방해 안 받도록
-                wmDiv.style.zIndex = '0';
-                wmDiv.style.whiteSpace = 'nowrap';
-                wmDiv.style.userSelect = 'none';
-                wmDiv.textContent = wmText;
-
-                // 에디터의 position을 relative로 보장 (이미 css에 있을 수 있지만 안전하게)
-                if (window.getComputedStyle(editor).position === 'static') {
-                    editor.style.position = 'relative';
-                }
-
-                editor.appendChild(wmDiv);
-            }
-        }
-
-        if (action === "교정") {
-            // AI 탭으로 전환될 때 처리 (기존 alert 제거)
+        if (shapeSVG) {
+            const wrapperHTML = `<div class="shape-container" contenteditable="false" style="${shapeStyle}">${shapeSVG}<div class="resize-handle"></div></div>&nbsp;`;
+            insertHTMLAtCursor(wrapperHTML);
         }
     });
-});
+}
+
+const insertLinkBtn = document.getElementById('insertLinkBtn');
+if (insertLinkBtn) {
+    insertLinkBtn.addEventListener('click', () => {
+        const url = prompt("링크 입력!");
+        if (url) {
+            focusEditor();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const link = document.createElement('a');
+                link.href = url;
+                link.textContent = selection.toString();
+                link.target = '_blank';
+                range.deleteContents();
+                range.insertNode(link);
+            } else {
+                const linkText = prompt("링크 텍스트 입력:");
+                if (linkText) {
+                    const link = `<a href="${url}" target="_blank">${linkText}</a> `;
+                    insertHTMLAtCursor(link);
+                }
+            }
+        }
+    });
+}
+
+const insertTableBtn = document.getElementById('insertTableBtn');
+if (insertTableBtn) {
+    insertTableBtn.addEventListener('click', () => {
+        const rows = prompt("행 개수 입력:", "2");
+        const cols = prompt("열 개수 입력:", "2");
+        if (rows && cols) {
+            let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;"><tbody>';
+            for (let i = 0; i < parseInt(rows); i++) {
+                tableHTML += '<tr>';
+                for (let j = 0; j < parseInt(cols); j++) {
+                    tableHTML += '<td style="padding: 8px;">&nbsp;</td>';
+                }
+                tableHTML += '</tr>';
+            }
+            tableHTML += '</tbody></table><br>';
+            insertHTMLAtCursor(tableHTML);
+        }
+    });
+}
+
+const insertWatermarkBtn = document.getElementById('insertWatermarkBtn');
+if (insertWatermarkBtn) {
+    insertWatermarkBtn.addEventListener('click', () => {
+        const wmText = prompt("워터마크로 사용할 텍스트를 입력하세요:", "CONFIDENTIAL");
+        if (wmText) {
+            const oldWm = editor.querySelector('.watermark-overlay');
+            if (oldWm) oldWm.remove();
+
+            const wmDiv = document.createElement('div');
+            wmDiv.className = 'watermark-overlay';
+            wmDiv.style.position = 'absolute';
+            wmDiv.style.top = '50%';
+            wmDiv.style.left = '50%';
+            wmDiv.style.transform = 'translate(-50%, -50%) rotate(-45deg)';
+            wmDiv.style.fontSize = '80px';
+            wmDiv.style.color = 'rgba(0, 0, 0, 0.05)';
+            wmDiv.style.pointerEvents = 'none';
+            wmDiv.style.zIndex = '0';
+            wmDiv.style.whiteSpace = 'nowrap';
+            wmDiv.style.userSelect = 'none';
+            wmDiv.textContent = wmText;
+
+            if (window.getComputedStyle(editor).position === 'static') {
+                editor.style.position = 'relative';
+            }
+            editor.appendChild(wmDiv);
+        }
+    });
+}
 
 // === 글자 스타일 T / 기울임 / 취소선 / 색상 === //
 // 직접 스타일 적용 함수 (execCommand 대신 DOM 직접 조작)
@@ -466,37 +544,15 @@ function initStyleButtons() {
     const homeContent = document.querySelector('.home_content');
     if (!homeContent || styleButtonsInitialized) return;
 
-    const buttons = homeContent.querySelectorAll('.menu_button');
-
-    // 굵게 버튼 (font-weight: bold 스타일을 가진 버튼)
-    const boldBtn = Array.from(buttons).find(btn =>
-        window.getComputedStyle(btn).fontWeight === 'bold' ||
-        window.getComputedStyle(btn).fontWeight === '700' ||
-        btn.style.fontWeight === 'bold'
-    );
-
-    // 기울임 버튼 (font-style: italic 스타일을 가진 버튼)
-    const italicBtn = Array.from(buttons).find(btn =>
-        window.getComputedStyle(btn).fontStyle === 'italic' ||
-        btn.style.fontStyle === 'italic'
-    );
-
-    // 취소선 버튼 (text-decoration: line-through 스타일을 가진 버튼)
-    const strikeBtn = Array.from(buttons).find(btn =>
-        window.getComputedStyle(btn).textDecoration.includes('line-through') ||
-        btn.style.textDecoration.includes('line-through')
-    );
-
-    // 색상 버튼 (C 텍스트를 가진 버튼)
-    const colorBtn = Array.from(buttons).find(btn => btn.textContent.trim() === 'C');
-
-    console.log('스타일 버튼 찾기:', { boldBtn, italicBtn, strikeBtn, colorBtn });
+    const boldBtn = document.getElementById('boldBtn');
+    const italicBtn = document.getElementById('italicBtn');
+    const strikeBtn = document.getElementById('strikeBtn');
+    const colorBtn = document.getElementById('colorBtn');
 
     if (boldBtn) {
         boldBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('굵게 버튼 클릭');
             applyStyleToSelection('fontWeight', 'bold');
         };
     }
@@ -505,7 +561,6 @@ function initStyleButtons() {
         italicBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('기울임 버튼 클릭');
             applyStyleToSelection('fontStyle', 'italic');
         };
     }
@@ -514,7 +569,6 @@ function initStyleButtons() {
         strikeBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('취소선 버튼 클릭');
             applyStyleToSelection('textDecoration', 'line-through');
         };
     }
@@ -523,7 +577,6 @@ function initStyleButtons() {
         colorBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('색상 버튼 클릭');
             openColorPicker();
         };
     }
@@ -842,45 +895,9 @@ function onResizeUp(e) {
 
 // === 노트 생성 및 로드 기능 === //
 
-// 노트 생성 버튼
-const addNewNoteBtn = document.querySelector('.add_new_note');
-if (addNewNoteBtn) {
-    addNewNoteBtn.addEventListener('click', async () => {
-        const title = prompt("새 노트의 제목을 입력하세요:", "제목 없음");
+// (Legacy note creation logic removed)
 
-        if (!title) {
-            alert("제목을 입력해주세요.");
-            return;
-        }
 
-        const userId = loggedInUserId;
-        if (!userId) {
-            alert("로그인이 필요합니다.");
-            return;
-        }
-
-        try {
-            const response = await fetch('/create_note', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, userId }),
-            });
-
-            const data = await response.json();
-
-            if (data.message === "1") {
-                alert("노트가 생성되었습니다!");
-                // 노트 목록 새로고침
-                loadUserNotes();
-            } else {
-                alert("노트 생성 실패: " + (data.error || "알 수 없는 오류"));
-            }
-        } catch (error) {
-            console.error("Create Note Error:", error);
-            alert("서버와 통신 중 오류가 발생했습니다.");
-        }
-    });
-}
 
 // 사용자의 노트 목록 로드
 async function loadUserNotes() {
@@ -897,6 +914,7 @@ async function loadUserNotes() {
         const data = await response.json();
 
         if (data.message === "2") {
+            currentNotes = data.notes;
             displayNotes(data.notes);
         } else {
             console.error("노트 로드 실패:", data.error);
@@ -929,38 +947,27 @@ function displayNotes(notes) {
     notes.forEach(note => {
         const noteItem = document.createElement('div');
         noteItem.className = 'note_item';
-        noteItem.style.cssText = 'background: white; padding: 15px; margin: 10px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s;';
 
-        noteItem.addEventListener('mouseenter', () => {
-            noteItem.style.transform = 'translateY(-2px)';
-            noteItem.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-        });
+        // 텍스트 요약 생성 (HTML 태그 제거)
+        const plainText = (note.contents || '').replace(/<[^>]*>/g, '');
+        const summary = plainText.substring(0, 100) + (plainText.length > 100 ? '...' : '');
 
-        noteItem.addEventListener('mouseleave', () => {
-            noteItem.style.transform = 'translateY(0)';
-            noteItem.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-        });
-
-        const noteTitle = document.createElement('p');
-        noteTitle.className = 'note_title';
-        noteTitle.textContent = note.title;
-        noteTitle.style.cssText = 'font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #333;';
-
-        const noteEditors = document.createElement('div');
-        noteEditors.className = 'note_editors';
-        noteEditors.style.cssText = 'display: flex; gap: 5px; flex-wrap: wrap;';
-
-        // 편집자 목록 표시
-        note.editors.forEach(editor => {
-            const editorItem = document.createElement('div');
-            editorItem.className = 'editor_item';
-            editorItem.textContent = editor;
-            editorItem.style.cssText = 'background: #2487ac; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;';
-            noteEditors.appendChild(editorItem);
-        });
-
-        noteItem.appendChild(noteTitle);
-        noteItem.appendChild(noteEditors);
+        noteItem.innerHTML = `
+            <div class="note_title">${note.title}</div>
+            <div class="note_summary">${summary || '내용 없음'}</div>
+            <div class="note_footer">
+                <div class="note_date" style="font-size: 11px; color: #999;">
+                    ${new Date(note.createdAt || Date.now()).toLocaleDateString()}
+                </div>
+                <div class="note_editors">
+                    ${(note.editors || []).map(editor => `
+                        <div class="editor_badge" title="${editor}">
+                            ${editor.charAt(0).toUpperCase()}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
 
         // 노트 클릭 시 에디터 열기
         noteItem.addEventListener('click', () => {
@@ -1111,13 +1118,265 @@ function stopAutoSave() {
     }
 }
 
-// 수동 저장 버튼 이벤트
-const saveNoteBtn = document.getElementById('saveNoteBtn');
-if (saveNoteBtn) {
-    saveNoteBtn.addEventListener('click', () => {
-        saveNote(true); // 수동 저장은 알림 표시
+// 메인 메뉴로 돌아가기 (저장 포함)
+async function backToMainMenu() {
+    // 1. 저장 수행
+    await saveNote(false);
+
+    // 2. 자동 저장 중지
+    stopAutoSave();
+
+    // 3. 소켓 방 퇴장 (필요시)
+    // socket.emit('leave-note', { noteId: currentNoteId, userId: loggedInUserId });
+
+    // 4. 화면 전환
+    const mainMenu = document.querySelector('.main_menu');
+    const editorMain = document.querySelector('.editor_main');
+
+    if (editorMain) editorMain.style.display = 'none';
+    if (mainMenu) {
+        mainMenu.style.display = 'block';
+        // 노트 목록 갱신
+        loadUserNotes();
+    }
+}
+
+// 수동 저장 버튼 이벤트 및 뒤로 가기 버튼 이벤트
+//기존 saveNoteBtn 리스너 제거 (중복 방지)
+// 기존 saveNoteBtn 대신 새로운 버튼들 연결
+const onlineSaveBtn = document.getElementById('onlineSaveBtn');
+const ntSaveBtn = document.getElementById('ntSaveBtn');
+const pdfSaveBtn = document.getElementById('pdfSaveBtn');
+const wordSaveBtn = document.getElementById('wordSaveBtn');
+
+if (onlineSaveBtn) onlineSaveBtn.onclick = (e) => { e.stopPropagation(); saveNote(true); };
+if (ntSaveBtn) ntSaveBtn.onclick = (e) => { e.stopPropagation(); exportNt(); };
+if (pdfSaveBtn) pdfSaveBtn.onclick = (e) => { e.stopPropagation(); exportPdf(); };
+if (wordSaveBtn) wordSaveBtn.onclick = (e) => { e.stopPropagation(); exportDocx(); };
+
+document.getElementById('onlineLoadBtn').onclick = () => openOnlineLoadModal();
+document.getElementById('localLoadBtn').onclick = () => document.getElementById('localFileInput').click();
+
+// 사이드바 토글 버튼들
+document.getElementById('memberToggleBtn').onclick = () => {
+    document.getElementById('memberSidebar').classList.add('open');
+};
+document.getElementById('helpToggleBtn').onclick = () => {
+    document.getElementById('rightSidebar').classList.add('open');
+};
+document.getElementById('infoToggleBtn').onclick = () => {
+    document.getElementById('infoSidebar').classList.add('open');
+};
+
+// 사이드바 닫기 버튼들
+document.getElementById('closeMemberSidebarBtn').onclick = () => {
+    document.getElementById('memberSidebar').classList.remove('open');
+};
+document.getElementById('closeSidebarBtn').onclick = () => {
+    document.getElementById('rightSidebar').classList.remove('open');
+};
+document.getElementById('closeInfoSidebarBtn').onclick = () => {
+    document.getElementById('infoSidebar').classList.remove('open');
+};
+
+const backToHomeBtn = document.getElementById('backToHomeBtn');
+if (backToHomeBtn) {
+    backToHomeBtn.addEventListener('click', () => {
+        backToMainMenu();
     });
 }
+
+// === 파일 내보내기 기능 ===
+function downloadFile(content, fileName, contentType) {
+    const a = document.createElement("a");
+    const file = new Blob([content], { type: contentType });
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function exportNt() {
+    const editor = document.querySelector('.content');
+    const title = editor.dataset.noteTitle || 'note';
+    downloadFile(editor.innerHTML, `${title}.nt`, 'text/html');
+}
+
+function exportDocx() {
+    const editor = document.querySelector('.content');
+    const title = editor.dataset.noteTitle || 'note';
+
+    // HTML을 Word가 인식하는 형식으로 감싸기
+    const preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML to Word Document with JavaScript</title><style>body{font-family:'Noto Sans KR', sans-serif;} p{margin-bottom:10px;}</style></head><body>";
+    const postHtml = "</body></html>";
+
+    // 내용 결합
+    const html = preHtml + editor.innerHTML + postHtml;
+
+    // Blob 생성 (MS Word MIME type)
+    const blob = new Blob(['\ufeff', html], {
+        type: 'application/msword'
+    });
+
+    // 다운로드 링크 생성
+    const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
+
+    // navigator.msSaveOrOpenBlob IE support, else downloadFile logic
+    const downloadLink = document.createElement("a");
+    document.body.appendChild(downloadLink);
+
+    if (navigator.msSaveOrOpenBlob) {
+        navigator.msSaveOrOpenBlob(blob, `${title}.doc`);
+    } else {
+        downloadLink.href = url;
+        downloadLink.download = `${title}.doc`;
+        downloadLink.click();
+    }
+
+    document.body.removeChild(downloadLink);
+}
+
+async function exportPdf() {
+    const editor = document.querySelector('.content');
+    const title = editor.dataset.noteTitle || 'note';
+
+    const tempWrapper = document.createElement('div');
+    tempWrapper.id = 'pdf-temp-wrapper';
+    tempWrapper.style.padding = '40px';
+    tempWrapper.style.background = '#fff';
+    tempWrapper.style.width = '750px';
+
+    // 🔥 핵심
+    tempWrapper.style.position = 'absolute';
+    tempWrapper.style.top = '0';
+    tempWrapper.style.left = '0';
+    tempWrapper.style.zIndex = '-1';   // 화면 뒤로만 보냄
+    tempWrapper.style.color = '#000';
+    tempWrapper.style.fontFamily = '"Noto Sans KR", Arial, sans-serif';
+
+    tempWrapper.innerHTML = editor.innerHTML;
+    document.body.appendChild(tempWrapper);
+
+    // ✅ 이미지 로딩 대기 (안 기다리면 빈 캔버스 나올 때 있음)
+    const imgs = [...tempWrapper.querySelectorAll('img')];
+    await Promise.all(imgs.map(img => new Promise(res => {
+        if (img.complete) return res();
+        img.onload = () => res();
+        img.onerror = () => res();
+    })));
+
+    // ✅ 이미지가 있는 경우 scale을 낮추는 게 안정적임
+    // (이미지가 없으면 scale 2도 괜찮음)
+    const hasImage = imgs.length > 0;
+    const scaleValue = hasImage ? 1 : 2;
+
+    const opt = {
+        margin: [15, 15, 15, 15],
+        filename: `${title}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+            scale: scaleValue,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+
+            onclone: (clonedDoc) => {
+                const w = clonedDoc.querySelector('#pdf-temp-wrapper');
+                if (!w) return;
+
+                // ❌ transform / opacity / visibility 만지지 마
+                w.style.position = 'relative';
+                w.style.background = '#fff';
+                w.style.color = '#000';
+
+                // 이미지 안정화
+                w.querySelectorAll('img').forEach(img => {
+                    img.style.maxWidth = '100%';
+                    img.style.height = 'auto';
+                    img.style.display = 'block';
+                });
+            }
+
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    try {
+        showNotification("PDF 저장 중...");
+        await html2pdf().set(opt).from(tempWrapper).save();
+        showNotification("PDF 저장이 완료되었습니다.");
+    } catch (err) {
+        console.error("PDF Export Error:", err);
+        alert("PDF 생성 중 오류가 발생했습니다.");
+    } finally {
+        tempWrapper.remove();
+    }
+}
+
+
+
+// === 불러오기 기능 ===
+async function openOnlineLoadModal() {
+    // 리스트를 띄우기 전 최신 노트 목록을 다시 로드
+    await loadUserNotes();
+
+    const modal = document.getElementById('onlineLoadModal');
+    const listContainer = document.getElementById('onlineLoadList');
+    listContainer.innerHTML = '';
+
+    modal.style.display = 'flex';
+
+    // 현재 편집 중인 노트 제외하고 목록 표시
+    const currentNoteId = document.querySelector('.content').dataset.noteId;
+    const otherNotes = currentNotes.filter(n => n._id !== currentNoteId);
+
+    if (otherNotes.length === 0) {
+        listContainer.innerHTML = '<p style="text-align:center; color:#999; padding:20px;">불러올 다른 문서가 없습니다.</p>';
+        return;
+    }
+
+    otherNotes.forEach(note => {
+        const item = document.createElement('div');
+        item.className = 'load-note-item';
+        item.innerHTML = `
+            <div class="note-name">${note.title}</div>
+            <div class="note-meta">${new Date(note.createdAt || Date.now()).toLocaleDateString()}</div>
+        `;
+        item.onclick = () => {
+            if (confirm(`'${note.title}' 내용을 가져오시겠습니까? 현재 내용은 덮어씌워집니다.`)) {
+                const editor = document.querySelector('.content');
+                editor.innerHTML = note.contents || '';
+                modal.style.display = 'none';
+                showNotification("문서를 불러왔습니다.");
+            }
+        };
+        listContainer.appendChild(item);
+    });
+}
+
+document.getElementById('cancelOnlineLoadBtn').onclick = () => {
+    document.getElementById('onlineLoadModal').style.display = 'none';
+};
+
+// 로컬 파일 처리
+document.getElementById('localFileInput').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target.result;
+        if (confirm("로컬 파일을 불러오시겠습니까? 현재 내용은 덮어씌워집니다.")) {
+            const editor = document.querySelector('.content');
+            editor.innerHTML = content;
+            showNotification("로컬 문서를 불러왔습니다.");
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // 초기화
+};
+
 
 // 페이지 떠나기 전 저장 (선택사항)
 window.addEventListener('beforeunload', (e) => {
@@ -1130,55 +1389,8 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 
-// 로그인 성공 시 노트 목록 로드
-const originalLoginHandler = login_btn.onclick;
-login_btn.onclick = null; // 기존 핸들러 제거
-
-login_btn.addEventListener('click', async () => {
-    const id = document.querySelector('#id_input').value;
-    const pw = document.querySelector('#pw_input').value;
-
-    if (!id || !pw) {
-        alert("아이디와 비밀번호를 입력해주세요.");
-        return;
-    }
-
-    try {
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ id, pw }),
-        });
-
-        const data = await response.json();
-
-        if (data.message === "2") {
-            // 로그인 성공
-            login_div.style.display = 'none';
-            main_div.style.display = 'block';
-
-            // 사용자 정보 저장 (전역 변수에 저장)
-            loggedInUserId = id;
-            localStorage.setItem('user_id', id);
-            localStorage.setItem('user_desc', data.desc);
-            document.querySelector('.username').textContent = id;
-
-            // 노트 목록 로드
-            loadUserNotes();
-        } else if (data.message === "-1") {
-            alert("존재하지 않는 아이디입니다.");
-        } else if (data.message === "-2") {
-            alert("비밀번호가 일치하지 않습니다.");
-        } else {
-            alert("로그인 오류가 발생했습니다.");
-        }
-    } catch (error) {
-        console.error("Login Error:", error);
-        alert("서버와 통신 중 오류가 발생했습니다.");
-    }
-});
+// Note: Login logic is now handled by performLogin function at the top.
+// Duplicate event listener on line 1361-1408 removed.
 
 // === 실시간 협업 기능 (Socket.io) === //
 
@@ -1197,6 +1409,15 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('Socket connected:', socket.id);
+        if (loggedInUserId) {
+            socket.emit('register-user', loggedInUserId);
+        }
+    });
+
+    // 워크스페이스 초대 실시간 알림
+    socket.on('workspace-invite', ({ workspaceId, name }) => {
+        showNotification(`'${name}' 워크스페이스에 초대되었습니다!`);
+        loadInvitations(); // 초대 목록 갱신
     });
 
     // 새 사용자 참여
@@ -1840,4 +2061,434 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// === 워크스페이스 기능 상세 구현 === //
 
+// 워크스페이스 목록 로드
+async function loadWorkspaces() {
+    if (!loggedInUserId) return;
+    try {
+        const response = await fetch('/get_workspaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: loggedInUserId })
+        });
+        const data = await response.json();
+        if (data.message === "1") {
+            currentWorkspaces = data.workspaces;
+            renderWorkspaces();
+            updateWorkspaceSelect();
+        }
+    } catch (error) {
+        console.error("Load Workspaces Error:", error);
+    }
+}
+
+// 초대 목록 로드
+async function loadInvitations() {
+    if (!loggedInUserId) return;
+    try {
+        const response = await fetch('/get_workspaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: loggedInUserId })
+        });
+        const data = await response.json();
+        if (data.message === "1") {
+            currentInvitations = data.workspaces.filter(ws =>
+                ws.members.some(m => m.userId === loggedInUserId && m.status === 'pending')
+            );
+            renderInvitations();
+        }
+    } catch (error) {
+        console.error("Load Invitations Error:", error);
+    }
+}
+
+// 워크스페이스 목록 렌더링
+function renderWorkspaces() {
+    const listContainer = document.getElementById('myWorkspaceList');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    const acceptedWorkspaces = currentWorkspaces.filter(ws =>
+        ws.members.some(m => m.userId === loggedInUserId && m.status === 'accepted')
+    );
+
+    if (acceptedWorkspaces.length === 0) {
+        listContainer.innerHTML = '<p style="color: #999; font-size: 13px;">참여 중인 워크스페이스가 없습니다.</p>';
+        return;
+    }
+
+    acceptedWorkspaces.forEach(ws => {
+        const memberCount = ws.members ? ws.members.length : 0;
+        listContainer.insertAdjacentHTML('beforeend', `
+            <div class="workspace-item" onclick="openWorkspaceDetail('${ws._id}')" style="cursor: pointer;">
+                <div class="workspace-info">
+                    <span class="workspace-name">${ws.name}</span>
+                    <span class="workspace-meta">멤버 ${memberCount}명</span>
+                </div>
+            </div>
+        `);
+    });
+}
+
+// 초대 목록 렌더링
+function renderInvitations() {
+    const section = document.getElementById('workspaceInvitationsSection');
+    const listContainer = document.getElementById('workspaceInvitationsList');
+    if (!section || !listContainer) return;
+
+    if (currentInvitations.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    listContainer.innerHTML = '';
+
+    currentInvitations.forEach(ws => {
+        const div = document.createElement('div');
+        div.className = 'invitation-item';
+        div.innerHTML = `
+            <div class="invitation-header">
+                <span class="invitation-badge">New</span>
+                <p class="invitation-text"><b>${ws.name}</b> 워크스페이스 초대</p>
+            </div>
+            <div class="invitation-actions">
+                <button class="btn-accept" onclick="respondInvitation('${ws._id}', 'accepted')">수락</button>
+                <button class="btn-decline" onclick="respondInvitation('${ws._id}', 'declined')">거절</button>
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+}
+
+// 초대 응답
+async function respondInvitation(workspaceId, response) {
+    try {
+        const res = await fetch('/respond_to_invitation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workspaceId, userId: loggedInUserId, response })
+        });
+        const data = await res.json();
+        if (data.message === "1") {
+            showNotification(response === 'accepted' ? "워크스페이스에 참여했습니다." : "초대를 거절했습니다.");
+            loadWorkspaces();
+            loadInvitations();
+        }
+    } catch (error) {
+        console.error("Respond Invitation Error:", error);
+    }
+}
+
+// --- 워크스페이스 생성 모달 핸들링 ---
+const createWorkspaceModal = document.getElementById('createWorkspaceModal');
+const openWorkspaceModalBtn = document.getElementById('openCreateWorkspaceModal');
+const cancelWorkspaceBtn = document.getElementById('cancelWorkspaceBtn');
+const submitWorkspaceBtn = document.getElementById('submitWorkspaceBtn');
+
+if (openWorkspaceModalBtn) {
+    openWorkspaceModalBtn.addEventListener('click', () => {
+        createWorkspaceModal.style.display = 'flex';
+    });
+}
+
+if (cancelWorkspaceBtn) {
+    cancelWorkspaceBtn.addEventListener('click', () => {
+        createWorkspaceModal.style.display = 'none';
+        document.getElementById('workspaceNameInput').value = '';
+    });
+}
+
+if (submitWorkspaceBtn) {
+    submitWorkspaceBtn.addEventListener('click', async () => {
+        const name = document.getElementById('workspaceNameInput').value.trim();
+        if (!name) return alert("워크스페이스 이름을 입력하세요.");
+
+        try {
+            const response = await fetch('/create_workspace', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, ownerId: loggedInUserId })
+            });
+            const data = await response.json();
+            if (data.message === "1") {
+                showNotification("워크스페이스가 생성되었습니다.");
+                createWorkspaceModal.style.display = 'none';
+                document.getElementById('workspaceNameInput').value = '';
+                loadWorkspaces();
+            }
+        } catch (error) {
+            console.error("Create Workspace Error:", error);
+        }
+    });
+}
+
+// --- 멤버 초대 모달 핸들링 ---
+let currentInviteWorkspaceId = null;
+function openInviteModal(id, name) {
+    currentInviteWorkspaceId = id;
+    const targetName = document.getElementById('targetWorkspaceName');
+    if (targetName) targetName.textContent = `워크스페이스: ${name}`;
+    const modal = document.getElementById('inviteMemberModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+const inviteMemberModal = document.getElementById('inviteMemberModal');
+const cancelInviteBtn = document.getElementById('cancelInviteBtn');
+const submitInviteBtn = document.getElementById('submitInviteBtn');
+
+if (cancelInviteBtn) {
+    cancelInviteBtn.addEventListener('click', () => {
+        inviteMemberModal.style.display = 'none';
+        document.getElementById('targetUserIdInput').value = '';
+    });
+}
+
+if (submitInviteBtn) {
+    submitInviteBtn.addEventListener('click', async () => {
+        const targetUserId = document.getElementById('targetUserIdInput').value.trim();
+        if (!targetUserId) return alert("초대할 사용자 ID를 입력하세요.");
+
+        try {
+            const response = await fetch('/invite_to_workspace', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workspaceId: currentInviteWorkspaceId, targetUserId })
+            });
+            const data = await response.json();
+            if (data.message === "1") {
+                showNotification(`${targetUserId}님에게 초대를 보냈습니다.`);
+                inviteMemberModal.style.display = 'none';
+                document.getElementById('targetUserIdInput').value = '';
+            } else {
+                alert(data.error || "초대 실패");
+            }
+        } catch (error) {
+            console.error("Invite Member Error:", error);
+        }
+    });
+}
+
+// --- 워크스페이스 상세 보기 ---
+function openWorkspaceDetail(wsId) {
+    const ws = currentWorkspaces.find(w => w._id === wsId);
+    if (!ws) return;
+
+    // UI 전환
+    document.getElementById('workspaceHeader').style.display = 'none';
+    document.getElementById('workspaceListSection').style.display = 'none';
+    document.getElementById('workspaceInvitationsSection').style.display = 'none';
+    const detailView = document.getElementById('workspaceDetailView');
+    detailView.style.display = 'block';
+    window.scrollTo(0, 0);
+
+    // 내용 채우기
+    document.getElementById('wsDetailName').textContent = ws.name;
+    document.getElementById('wsDetailDesc').style.display = 'none'; // 설명 대신 노트 목록 표시
+
+    // 워크스페이스 노트 렌더링
+    const noteList = document.getElementById('wsNoteList');
+    noteList.innerHTML = '';
+
+    // 전역 userNotes 또는 fetch한 데이터에서 해당 워크스페이스의 노트를 필터링
+    // userNotes가 전역으로 선언되어 있어야 함 (기존 loadUserNotes 참고)
+    const wsNotes = currentNotes.filter(n => n.workspaceId === wsId);
+
+    if (wsNotes.length === 0) {
+        noteList.innerHTML = '<p style="color: #999; font-size: 13px; padding: 20px;">이 워크스페이스에 생성된 노트가 없습니다.</p>';
+    } else {
+        wsNotes.forEach(note => {
+            const card = document.createElement('div');
+            card.className = 'ws-note-card';
+            card.onclick = () => openNoteInEditor(note);
+            card.innerHTML = `
+                <div class="note-title">${note.title}</div>
+                <div class="note-date">${new Date(note.createdAt || Date.now()).toLocaleDateString()}</div>
+            `;
+            noteList.appendChild(card);
+        });
+    }
+
+    const membersList = document.getElementById('wsDetailMembers');
+    membersList.innerHTML = '';
+
+    ws.members.forEach(member => {
+        const div = document.createElement('div');
+        div.className = 'member-item';
+        div.innerHTML = `
+            <div class="member-avatar">${member.userId.substring(0, 2).toUpperCase()}</div>
+            <div class="member-info">
+                <span class="member-name">${member.userId}</span>
+                <span class="member-status">${member.status === 'accepted' ? '참여 중' : '대기 중'}</span>
+            </div>
+        `;
+        membersList.appendChild(div);
+    });
+
+    // 버튼 이벤트 연결
+    const leaveBtn = document.getElementById('leaveWorkspaceBtn');
+    leaveBtn.onclick = async () => {
+        if (confirm('워크스페이스에서 나가시겠습니까?')) {
+            try {
+                const res = await fetch('/respond_to_invitation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspaceId: ws._id, userId: loggedInUserId, response: 'declined' })
+                });
+                const data = await res.json();
+                if (data.message === "1") {
+                    showNotification("워크스페이스에서 나갔습니다.");
+                    await loadWorkspaces(); // 목록 갱신
+                    closeWorkspaceDetail();
+                }
+            } catch (error) {
+                console.error("Leave Workspace Error:", error);
+            }
+        }
+    };
+
+    const inviteBtn = document.getElementById('inviteToWorkspaceBtn');
+    inviteBtn.onclick = () => {
+        openInviteModal(ws._id, ws.name);
+    };
+}
+
+function closeWorkspaceDetail() {
+    document.getElementById('workspaceDetailView').style.display = 'none';
+    document.getElementById('workspaceHeader').style.display = 'flex';
+    document.getElementById('workspaceListSection').style.display = 'block';
+    window.scrollTo(0, 0);
+
+    // 초대 목록이 있으면 다시 표시
+    if (currentInvitations.length > 0) {
+        document.getElementById('workspaceInvitationsSection').style.display = 'block';
+    }
+}
+
+// 돌아가기 버튼 이벤트
+document.getElementById('backToWorkspaceList').addEventListener('click', closeWorkspaceDetail);
+
+// --- 노트 생성 모달 핸들링 업데이트 ---
+function updateWorkspaceSelect() {
+    const select = document.getElementById('noteWorkspaceSelect');
+    if (!select) return;
+
+    // 기본 옵션만 남기고 초기화
+    select.innerHTML = '<option value="">(없음)</option>';
+
+    const acceptedWorkspaces = currentWorkspaces.filter(ws =>
+        ws.members.some(m => m.userId === loggedInUserId && m.status === 'accepted')
+    );
+
+    acceptedWorkspaces.forEach(ws => {
+        const opt = document.createElement('option');
+        opt.value = ws._id;
+        opt.textContent = ws.name;
+        select.appendChild(opt);
+    });
+}
+
+const createNoteModal = document.getElementById('createNoteWithWorkspaceModal');
+const cancelCreateNoteBtn = document.getElementById('cancelCreateNoteBtn');
+const submitCreateNoteBtn = document.getElementById('submitCreateNoteBtn');
+const noteWorkspaceSelect = document.getElementById('noteWorkspaceSelect');
+const inviteAllOption = document.getElementById('inviteAllOption');
+
+if (addNewNoteBtn) {
+    addNewNoteBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        updateWorkspaceSelect();
+        createNoteModal.style.display = 'flex';
+    };
+}
+
+if (noteWorkspaceSelect) {
+    noteWorkspaceSelect.addEventListener('change', () => {
+        if (noteWorkspaceSelect.value) {
+            inviteAllOption.style.display = 'flex';
+        } else {
+            inviteAllOption.style.display = 'none';
+        }
+    });
+}
+
+if (cancelCreateNoteBtn) {
+    cancelCreateNoteBtn.addEventListener('click', () => {
+        createNoteModal.style.display = 'none';
+        document.getElementById('noteTitleInput').value = '';
+        document.getElementById('noteWorkspaceSelect').value = '';
+        document.getElementById('inviteAllCheckbox').checked = false;
+        inviteAllOption.style.display = 'none';
+    });
+}
+
+if (submitCreateNoteBtn) {
+    submitCreateNoteBtn.addEventListener('click', async () => {
+        const titleInput = document.getElementById('noteTitleInput');
+        const title = titleInput.value.trim();
+        const workspaceSelect = document.getElementById('noteWorkspaceSelect');
+        const workspaceId = workspaceSelect.value;
+        const inviteAllCheckbox = document.getElementById('inviteAllCheckbox');
+        const inviteAll = inviteAllCheckbox.checked;
+
+        if (!title) return alert("제목을 입력해주세요.");
+
+        try {
+            const response = await fetch('/create_note', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    userId: loggedInUserId,
+                    workspaceId: workspaceId || null,
+                    inviteAll: inviteAll
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.message === "1") {
+                createNoteModal.style.display = 'none';
+                titleInput.value = '';
+                workspaceSelect.value = '';
+                inviteAllCheckbox.checked = false;
+                inviteAllOption.style.display = 'none';
+
+                // 노트 목록 갱신 및 열기
+                loadUserNotes(loggedInUserId);
+                openNoteInEditor({ _id: data.noteId, title: data.title, contents: "" });
+                showNotification("새 노트가 생성되었습니다.");
+            }
+        } catch (error) {
+            console.error("Create Note Error:", error);
+        }
+    });
+}
+// --- 알림 표시 기능 ---
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        z-index: 10005;
+        font-size: 14px;
+        animation: slideIn 0.3s ease-out, slideOut 0.3s ease-in 2.7s forwards;
+    `;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
