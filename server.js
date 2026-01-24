@@ -31,7 +31,7 @@ app.use(express.static(path.join(__dirname, "docs")));
 app.use(express.json());
 app.use(cors());
 
-const PORT = process.env.PORT || 3000;
+const PORT = 5000;
 
 // === Auth Routes ===
 
@@ -422,6 +422,6 @@ io.on("connection", (socket) => {
 });
 
 // Start Server
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Running on port ${PORT}`);
 });
