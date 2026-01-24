@@ -1168,27 +1168,8 @@ if (wordSaveBtn) wordSaveBtn.onclick = (e) => { e.stopPropagation(); exportDocx(
 document.getElementById('onlineLoadBtn').onclick = () => openOnlineLoadModal();
 document.getElementById('localLoadBtn').onclick = () => document.getElementById('localFileInput').click();
 
-// 사이드바 토글 버튼들
-document.getElementById('memberToggleBtn').onclick = () => {
-    document.getElementById('memberSidebar').classList.add('open');
-};
-document.getElementById('helpToggleBtn').onclick = () => {
-    document.getElementById('rightSidebar').classList.add('open');
-};
-document.getElementById('infoToggleBtn').onclick = () => {
-    document.getElementById('infoSidebar').classList.add('open');
-};
+// 사이드바 및 홈 버튼 초기값 설정 (필요시)
 
-// 사이드바 닫기 버튼들
-document.getElementById('closeMemberSidebarBtn').onclick = () => {
-    document.getElementById('memberSidebar').classList.remove('open');
-};
-document.getElementById('closeSidebarBtn').onclick = () => {
-    document.getElementById('rightSidebar').classList.remove('open');
-};
-document.getElementById('closeInfoSidebarBtn').onclick = () => {
-    document.getElementById('infoSidebar').classList.remove('open');
-};
 
 const backToHomeBtn = document.getElementById('backToHomeBtn');
 if (backToHomeBtn) {
