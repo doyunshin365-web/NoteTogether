@@ -615,7 +615,7 @@ function initStyleButtons() {
     const memberSidebar = document.getElementById('memberSidebar');
 
     // 도움말 사이드바 토글
-    const helpBtn = document.getElementById('helpToggleBtn');
+    const helpBtn = document.getElementById('btnHelpSidebar');
     const closeSidebarBtn = document.getElementById('closeSidebarBtn');
     const sidebar = document.getElementById('rightSidebar'); // Help sidebar
 
@@ -1457,22 +1457,14 @@ function initializeSocket() {
             isUpdatingFromRemote = true;
             const editor = document.querySelector('.content');
             if (editor) {
-                // 현재 커서 위치 저장
-                const selection = window.getSelection();
-                const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+                // 현재 커서 위치(오프셋) 저장
+                const offset = getCursorOffset(editor);
 
                 // HTML 그대로 설정 (서식 포함)
                 editor.innerHTML = content;
 
-                // 커서 위치 복원 시도
-                if (range) {
-                    try {
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                    } catch (e) {
-                        console.log('Could not restore cursor position');
-                    }
-                }
+                // 커서 위치 복원
+                setCursorOffset(editor, offset);
             }
             isUpdatingFromRemote = false;
         }
@@ -1568,16 +1560,17 @@ function sendCursorPosition() {
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
 
-        // 에디터 컨테이너 기준으로 위치 계산
-        const editorContainer = document.querySelector('.editor_main');
-        const containerRect = editorContainer ? editorContainer.getBoundingClientRect() : { left: 0, top: 0 };
+        // 에디터 본문(.content) 기준으로 위치 계산하여 전송 (정확도 향상)
+        const editor = document.querySelector('.content');
+        const editorRect = editor ? editor.getBoundingClientRect() : { left: 0, top: 0 };
 
         socket.emit('cursor-move', {
             noteId: currentNoteId,
             userId: currentUserId,
+            vertex: true, // 보정용 플래그
             position: {
-                x: rect.left - containerRect.left + editorContainer.scrollLeft,
-                y: rect.top - containerRect.top + editorContainer.scrollTop
+                x: rect.left - editorRect.left,
+                y: rect.top - editorRect.top
             },
             color: myColor
         });
@@ -1593,16 +1586,16 @@ function sendSelection() {
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
 
-        // 에디터 컨테이너 기준으로 위치 계산
-        const editorContainer = document.querySelector('.editor_main');
-        const containerRect = editorContainer ? editorContainer.getBoundingClientRect() : { left: 0, top: 0 };
+        // 에디터 본문(.content) 기준으로 위치 계산
+        const editor = document.querySelector('.content');
+        const editorRect = editor ? editor.getBoundingClientRect() : { left: 0, top: 0 };
 
         socket.emit('selection-change', {
             noteId: currentNoteId,
             userId: currentUserId,
             range: {
-                x: rect.left - containerRect.left + editorContainer.scrollLeft,
-                y: rect.top - containerRect.top + editorContainer.scrollTop,
+                x: rect.left - editorRect.left,
+                y: rect.top - editorRect.top,
                 width: rect.width,
                 height: rect.height
             },
@@ -1643,11 +1636,10 @@ function updateRemoteCursor(userId, position, color) {
         `;
         cursor.appendChild(label);
 
-        // 에디터 컨테이너에 추가
-        const editorContainer = document.querySelector('.editor_main');
-        if (editorContainer) {
-            editorContainer.style.position = 'relative'; // 상대 위치 기준 설정
-            editorContainer.appendChild(cursor);
+        // 에디터 본문(.content)에 추가하여 종이 위치와 동기화
+        const editor = document.querySelector('.content');
+        if (editor) {
+            editor.appendChild(cursor);
         } else {
             document.body.appendChild(cursor);
         }
@@ -1681,10 +1673,10 @@ function updateRemoteSelection(userId, range, color) {
         z-index: 9998;
     `;
 
-    // 에디터 컨테이너에 추가
-    const editorContainer = document.querySelector('.editor_main');
-    if (editorContainer) {
-        editorContainer.appendChild(selection);
+    // 에디터 본문(.content)에 추가
+    const editor = document.querySelector('.content');
+    if (editor) {
+        editor.appendChild(selection);
     } else {
         document.body.appendChild(selection);
     }
@@ -2492,3 +2484,56 @@ function showNotification(message) {
         notification.remove();
     }, 3000);
 }
+
+/**
+ * 에디터 내 커서 위치를 절대적인 텍스트 오프셋(글자 수)으로 반환하는 헬퍼
+ */
+function getCursorOffset(element) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return 0;
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(element);
+    preCaretRange.setEnd(range.startContainer, range.startOffset);
+    return preCaretRange.toString().length;
+}
+
+/**
+ * 텍스트 오프셋을 기준으로 에디터 내 커서 위치를 복원하는 헬퍼
+ */
+function setCursorOffset(element, offset) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    let currentOffset = 0;
+    let found = false;
+
+    function traverse(node) {
+        if (found) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+            const nextOffset = currentOffset + node.length;
+            if (offset <= nextOffset) {
+                range.setStart(node, offset - currentOffset);
+                range.collapse(true);
+                found = true;
+            }
+            currentOffset = nextOffset;
+        } else if (node.nodeName === 'BR') {
+            // BR 태그도 한 글자로 취급할 수 있으나 toString()에는 반영 안 됨. 
+            // 여기서는 단순 텍스트 기반으로 처리.
+        } else {
+            for (let i = 0; i < node.childNodes.length; i++) {
+                traverse(node.childNodes[i]);
+            }
+        }
+    }
+
+    traverse(element);
+    if (!found) {
+        // 끝까지 못 찾으면 맨 뒤로
+        range.selectNodeContents(element);
+        range.collapse(false);
+    }
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
