@@ -243,8 +243,8 @@ headerItems.forEach(item => {
         const targetContent = document.querySelector('.' + contentClass);
         if (targetContent) targetContent.style.display = 'flex';
 
-        // home_content가 보이면 스타일 버튼 초기화
-        if (contentClass === 'home_content') {
+        // home_content 또는 help_content가 보이면 스타일 버튼 초기화
+        if (contentClass === 'home_content' || contentClass === 'help_content') {
             setTimeout(() => initStyleButtons(), 10);
         }
     });
