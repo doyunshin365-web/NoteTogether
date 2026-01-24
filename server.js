@@ -31,7 +31,7 @@ app.use(express.static(path.join(__dirname, "docs")));
 app.use(express.json());
 app.use(cors());
 
-const PORT = 5000;
+const PORT = process.env.PORT || 3000;
 
 // === Auth Routes ===
 

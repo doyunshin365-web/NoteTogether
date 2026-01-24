@@ -1,0 +1,5 @@
+run = "npm start"
+entrypoint = "server.js"
+
+[modules]
+nodeBundle = true
