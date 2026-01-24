@@ -42,6 +42,17 @@ let currentWorkspaces = [];
 let currentInvitations = [];
 let currentNotes = [];
 
+// === 실시간 협업용 전역 변수 === //
+let socket = null;
+let currentNoteId = null;
+let currentUserId = null;
+let myColor = null;
+let remoteCursors = new Map(); // userId -> cursor element
+let isUpdatingFromRemote = false;
+let editorListenersAttached = false;
+let contentChangeTimeout = null;
+let cursorMoveTimeout = null;
+
 
 register_link.addEventListener('click', () => {
     login_div.style.display = 'none';
@@ -1394,13 +1405,6 @@ window.addEventListener('beforeunload', (e) => {
 
 // === 실시간 협업 기능 (Socket.io) === //
 
-let socket = null;
-let currentNoteId = null;
-let currentUserId = null;
-let myColor = null;
-let remoteCursors = new Map(); // userId -> cursor element
-let isUpdatingFromRemote = false;
-
 // Socket.io 연결
 function initializeSocket() {
     if (socket) return;
@@ -1484,10 +1488,6 @@ function initializeSocket() {
 }
 
 // 노트 방 참여
-let contentChangeTimeout = null;
-let cursorMoveTimeout = null;
-let editorListenersAttached = false;
-
 function joinNoteRoom(noteId, userId) {
     currentNoteId = noteId;
     currentUserId = userId;
