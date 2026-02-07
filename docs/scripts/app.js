@@ -1015,6 +1015,27 @@ function openNoteInEditor(note) {
 
     // 자동 저장 타이머 시작
     startAutoSave();
+
+    // === Yjs Initialization ===
+    if (window.initCRDT) {
+        if (window.crdt) {
+            window.crdt.cleanup();
+            window.crdt = null;
+        }
+        // User info from global state (loggedInUserId is set on login)
+        const user = {
+            id: loggedInUserId || 'Anonymous',
+            name: loggedInUserId || 'Anonymous'
+            // color handled by crdt-client if missing
+        };
+
+        console.log('Initializing CRDT for note:', note._id);
+        window.crdt = window.initCRDT(editor, note._id, user, (logs) => {
+            if (typeof renderSharedLogs === 'function') {
+                renderSharedLogs(logs);
+            }
+        });
+    }
 }
 
 // === 노트 저장 기능 === //
@@ -1131,6 +1152,22 @@ function stopAutoSave() {
 
 // 메인 메뉴로 돌아가기 (저장 포함)
 async function backToMainMenu() {
+    // 0. Yjs Cleanup
+    if (window.crdt) {
+        try {
+            window.crdt.cleanup();
+            window.crdt = null;
+        } catch (e) {
+            console.error("Yjs cleanup error:", e);
+        }
+        const logPanel = document.getElementById('log-panel');
+        if (logPanel) logPanel.style.display = 'none';
+
+        // Remove cursors manually if needed
+        const cursorContainer = document.getElementById('yjs-cursor-container');
+        if (cursorContainer) cursorContainer.remove();
+    }
+
     // 1. 저장 수행
     await saveNote(false);
 
@@ -1138,7 +1175,9 @@ async function backToMainMenu() {
     stopAutoSave();
 
     // 3. 소켓 방 퇴장 (필요시)
-    // socket.emit('leave-note', { noteId: currentNoteId, userId: loggedInUserId });
+    if (socket && currentNoteId && loggedInUserId) {
+        socket.emit('leave-note', { noteId: currentNoteId, userId: loggedInUserId });
+    }
 
     // 4. 화면 전환
     const mainMenu = document.querySelector('.main_menu');
@@ -1423,6 +1462,8 @@ function initializeSocket() {
         showNotification(`${userId}님이 나갔습니다.`);
     });
 
+    // --- Legacy Socket.io Sync Disabled for Yjs ---
+    /*
     // 커서 업데이트
     socket.on('cursor-update', ({ userId, position, color }) => {
         updateRemoteCursor(userId, position, color);
@@ -1454,6 +1495,8 @@ function initializeSocket() {
             isUpdatingFromRemote = false;
         }
     });
+    */
+    // ---------------------------------------------
 
     // 영역 잠금 알림 (AI 교정 중)
     socket.on('region-locked', ({ userId, range }) => {
@@ -1484,6 +1527,7 @@ function joinNoteRoom(noteId, userId) {
     if (editor && !editorListenersAttached) {
         editorListenersAttached = true;
 
+        /* --- Legacy Socket.io Emitters Disabled for Yjs ---
         // 내용 변경 감지
         const handleInput = () => {
             if (isUpdatingFromRemote) return;
@@ -1529,6 +1573,8 @@ function joinNoteRoom(noteId, userId) {
         });
 
         console.log('Editor event listeners attached');
+        */
+        // --------------------------------------------------
     }
 }
 
@@ -2518,3 +2564,122 @@ function setCursorOffset(element, offset) {
     selection.addRange(range);
 }
 
+
+// === History Sidebar Logic ===
+const historySidebar = document.getElementById('historySidebar');
+const btnLogSidebar = document.getElementById('btnLogSidebar');
+const closeHistorySidebarBtn = document.getElementById('closeHistorySidebarBtn');
+
+function toggleHistorySidebar() {
+    if (!historySidebar) return;
+
+    // Close other sidebars if open
+    const sidebars = document.querySelectorAll('.right-sidebar');
+    sidebars.forEach(sb => {
+        if (sb !== historySidebar) {
+            sb.style.right = '-400px';
+            sb.classList.remove('open'); // Ensure class state is also managed if used elsewhere
+        }
+    });
+
+    if (historySidebar.style.right === '0px') {
+        historySidebar.style.right = '-400px';
+    } else {
+        historySidebar.style.right = '0px';
+    }
+}
+
+if (btnLogSidebar) btnLogSidebar.addEventListener('click', toggleHistorySidebar);
+if (closeHistorySidebarBtn) closeHistorySidebarBtn.addEventListener('click', toggleHistorySidebar);
+
+// Initial Setup
+if (historySidebar) historySidebar.style.right = '-400px';
+
+// Render Logs function (called from crdt-client.js via initCRDT callback)
+function renderSharedLogs(logs) {
+    const list = document.getElementById('historyList');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: #999; margin-top: 20px;">기록이 없습니다.</div>';
+        return;
+    }
+
+    logs.forEach(log => {
+        // Log Item Container
+        const item = document.createElement('div');
+        item.style.padding = '12px';
+        item.style.borderBottom = '1px solid #eee';
+        item.style.display = 'flex';
+        item.style.gap = '10px';
+        item.style.fontSize = '13px';
+        item.style.background = '#fff';
+
+        // Avatar
+        const avatar = document.createElement('div');
+        avatar.style.width = '32px';
+        avatar.style.height = '32px';
+        avatar.style.borderRadius = '50%';
+        avatar.style.backgroundColor = log.color || '#ccc';
+        avatar.style.color = 'white';
+        avatar.style.display = 'flex';
+        avatar.style.alignItems = 'center';
+        avatar.style.justifyContent = 'center';
+        avatar.style.fontWeight = 'bold';
+        avatar.style.flexShrink = '0';
+        avatar.textContent = (log.user || '?').charAt(0).toUpperCase();
+
+        // Content
+        const content = document.createElement('div');
+        content.style.flex = '1';
+
+        // Header (Name + Time)
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.marginBottom = '4px';
+
+        const name = document.createElement('span');
+        name.style.fontWeight = 'bold';
+        name.style.color = '#333';
+        name.textContent = log.user || 'Anonymous';
+
+        const time = document.createElement('span');
+        time.style.fontSize = '11px';
+        time.style.color = '#999';
+        time.textContent = log.time || '';
+
+        header.appendChild(name);
+        header.appendChild(time);
+
+        // Body (Action + Text)
+        const body = document.createElement('div');
+        body.style.color = '#555';
+        body.style.wordBreak = 'break-all';
+
+        const actionSpan = document.createElement('span');
+        if (log.action === 'insert') {
+            actionSpan.textContent = '추가: ';
+            actionSpan.style.color = '#4CAF50';
+            actionSpan.style.fontWeight = 'bold';
+        } else if (log.action === 'delete') {
+            actionSpan.textContent = '삭제: ';
+            actionSpan.style.color = '#f44336';
+            actionSpan.style.fontWeight = 'bold';
+        }
+
+        body.appendChild(actionSpan);
+        body.appendChild(document.createTextNode(log.text));
+
+        content.appendChild(header);
+        content.appendChild(body);
+
+        item.appendChild(avatar);
+        item.appendChild(content);
+
+        list.appendChild(item);
+    });
+}
+window.renderSharedLogs = renderSharedLogs; // Ensure global access

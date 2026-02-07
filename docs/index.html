@@ -183,6 +183,7 @@
                 <div class="menu_item_content help_content">
                     <div class="menu_button" id="btnHelpSidebar">도움말</div>
                     <div class="menu_button" id="infoToggleBtn">정보</div>
+                    <div class="menu_button" id="btnLogSidebar">로그</div>
                 </div>
             </div>
         </div>
@@ -297,17 +298,28 @@
                 </p>
                 <p style="font-size: 14px; color: #666; line-height: 1.6; text-align: left;">
                     최근 업데이트:<br>
-                    - 마우스 커서가 상대방이 수정했을 때 처음으로 되돌아가는 버그를 수정했어요.<br>
-                    - 상대방의 마우스 커서 위치가 정확하게 표시되도록 수정했어요.<br>
-                    - 도움말 탭을 누르면 도움말 사이드바가 열리던 버그를 수정했어요.<br>
-                    - 도움말 탭에서 도움말 버튼이 작동하지 않는 버그를 수정했어요.<br>
-                    - 신규 유저를 위해 도움말 페이지를 업그레이드 했어요.
+                    - CRDT를 적용했어요.<br>
+                    - 수정 로그 기능이 추가됬어요.
                 </p>
                 <div
                     style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999;">
-                    Version 1.0.2<br>
+                    Version 1.1.0<br>
                     &copy; 2026 Doyun Shin
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 히스토리 사이드바 (추가됨) -->
+    <div id="historySidebar" class="right-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">문서 기록</span>
+            <button class="close-sidebar-btn" id="closeHistorySidebarBtn">&times;</button>
+        </div>
+        <div class="sidebar-body">
+            <div id="historyList" style="padding: 10px;">
+                <!-- 로그가 여기에 추가됩니다 -->
+                <div style="text-align: center; color: #999; margin-top: 20px;">기록이 없습니다.</div>
             </div>
         </div>
     </div>
@@ -399,6 +411,17 @@
     <input type="file" id="localFileInput" style="display: none;" accept=".nt">
 
     <script src="/socket.io/socket.io.js"></script>
+
+    <!-- CRDT Log Panel -->
+    <div id="log-panel" style="display: none;">
+        <div id="log-header">
+            <span>📋 Shared Log</span>
+        </div>
+        <div id="log-content"></div>
+    </div>
+
+    <!-- CRDT Bundle -->
+    <script src="./scripts/bundle.js"></script>
     <script src="./scripts/app.js"></script>
 </body>
 

@@ -10,10 +10,34 @@ const Workspace = require("./docs/models/workspace");
 const { Mistral } = require("@mistralai/mistralai");
 require("dotenv").config();
 
+
 const app = express();
 const server = http.createServer(app);
 const socketIO = require("socket.io");
 const io = socketIO(server);
+
+// --- Yjs Websocket Setup ---
+const WebSocket = require('ws');
+const setupWSConnection = require('y-websocket/bin/utils').setupWSConnection;
+const wss = new WebSocket.Server({ noServer: true });
+
+server.on('upgrade', (request, socket, head) => {
+  // socket.io handles its own paths (usually starting with /socket.io/),
+  // so we check for our specific path for Yjs.
+  // The client `WebsocketProvider` will connect to `ws://host/yjs/...`
+  if (request.url.startsWith('/yjs')) {
+    console.log("Handling Yjs upgrade for:", request.url);
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  }
+});
+
+wss.on('connection', (conn, req) => {
+  console.log("Yjs WebSocket connected:", req.url);
+  setupWSConnection(conn, req);
+});
+// ---------------------------
 
 const mistral = new Mistral({
   apiKey: process.env.MISTRAL_API_KEY,
@@ -342,26 +366,53 @@ io.on("connection", (socket) => {
   socket.on("join-note", ({ noteId, userId }) => {
     socket.join(noteId);
 
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
-    const existingUsers = activeUsers.get(noteId) || [];
-    const usedColors = existingUsers.map(u => u.color);
-    const availableColors = colors.filter(c => !usedColors.includes(c));
-    const userColor = availableColors.length > 0 ? availableColors[0] : colors[existingUsers.length % colors.length];
-
-    const userInfo = { socketId: socket.id, userId, color: userColor };
-
     if (!activeUsers.has(noteId)) {
       activeUsers.set(noteId, []);
     }
-    activeUsers.get(noteId).push(userInfo);
+
+    const users = activeUsers.get(noteId);
+
+    // Remove existing user if present (avoid duplicates on re-entry)
+    const existingIndex = users.findIndex(u => u.userId === userId);
+    if (existingIndex !== -1) {
+      users.splice(existingIndex, 1);
+    }
+
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
+    const usedColors = users.map(u => u.color);
+    const availableColors = colors.filter(c => !usedColors.includes(c));
+    const userColor = availableColors.length > 0 ? availableColors[0] : colors[users.length % colors.length];
+
+    const userInfo = { socketId: socket.id, userId, color: userColor };
+    users.push(userInfo);
 
     io.to(noteId).emit("user-joined", {
       userId,
       color: userColor,
-      users: activeUsers.get(noteId).map(u => ({ userId: u.userId, color: u.color }))
+      users: users.map(u => ({ userId: u.userId, color: u.color }))
     });
 
     console.log(`User ${userId} joined note ${noteId} with color ${userColor}`);
+  });
+
+  // 노트 방 퇴장
+  socket.on("leave-note", ({ noteId, userId }) => {
+    socket.leave(noteId);
+    if (activeUsers.has(noteId)) {
+      const users = activeUsers.get(noteId);
+      const index = users.findIndex(u => u.userId === userId);
+      if (index !== -1) {
+        users.splice(index, 1);
+        io.to(noteId).emit("user-left", {
+          userId,
+          users: users.map(u => ({ userId: u.userId, color: u.color }))
+        });
+        if (users.length === 0) {
+          activeUsers.delete(noteId);
+        }
+      }
+    }
+    console.log(`User ${userId} left note ${noteId}`);
   });
 
   // 커서 위치 전송
