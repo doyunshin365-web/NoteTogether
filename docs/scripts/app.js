@@ -620,68 +620,64 @@ function initStyleButtons() {
         };
     }
 
-    // 멤버 사이드바 토글
-    const memberBtn = document.getElementById('memberToggleBtn');
-    const closeMemberSidebarBtn = document.getElementById('closeMemberSidebarBtn');
+    // 사이드바 엘리먼트들
     const memberSidebar = document.getElementById('memberSidebar');
-
-    // 도움말 사이드바 토글
-    const helpBtn = document.getElementById('btnHelpSidebar');
-    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-    const sidebar = document.getElementById('rightSidebar'); // Help sidebar
-
-    // 정보 사이드바 토글
-    const infoBtn = document.getElementById('infoToggleBtn');
-    const infoCloseBtn = document.getElementById('closeInfoSidebarBtn');
+    const helpSidebar = document.getElementById('rightSidebar');
     const infoSidebar = document.getElementById('infoSidebar');
+    const historySidebar = document.getElementById('historySidebar');
 
-    if (memberBtn && memberSidebar) {
-        memberBtn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // 다른 사이드바 닫기
+    const allSidebars = [memberSidebar, helpSidebar, infoSidebar, historySidebar];
+
+    function closeAllSidebars() {
+        allSidebars.forEach(sidebar => {
             if (sidebar) sidebar.classList.remove('open');
-            memberSidebar.classList.add('open');
-        };
+        });
     }
 
-    if (closeMemberSidebarBtn && memberSidebar) {
-        closeMemberSidebarBtn.onclick = () => {
-            memberSidebar.classList.remove('open');
-        };
+    function toggleSidebar(targetSidebar) {
+        if (!targetSidebar) return;
+        const isOpen = targetSidebar.classList.contains('open');
+        closeAllSidebars();
+        if (!isOpen) {
+            targetSidebar.classList.add('open');
+        }
     }
 
-    if (helpBtn && sidebar) {
-        helpBtn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // 다른 사이드바 닫기
-            if (memberSidebar) memberSidebar.classList.remove('open');
-            sidebar.classList.add('open');
-        };
-    }
+    // 버튼 & 사이드바 매핑
+    const sidebarMappings = [
+        { btnId: 'memberToggleBtn', sidebar: memberSidebar },
+        { btnId: 'btnHelpSidebar', sidebar: helpSidebar },
+        { btnId: 'infoToggleBtn', sidebar: infoSidebar },
+        { btnId: 'btnLogSidebar', sidebar: historySidebar }
+    ];
 
-    if (closeSidebarBtn && sidebar) {
-        closeSidebarBtn.onclick = () => {
-            sidebar.classList.remove('open');
-        };
-    }
+    sidebarMappings.forEach(mapping => {
+        const btn = document.getElementById(mapping.btnId);
+        if (btn) {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSidebar(mapping.sidebar);
+            };
+        }
+    });
 
-    if (infoBtn && infoSidebar) {
-        infoBtn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // 다른 사이드바 닫기
-            if (memberSidebar) memberSidebar.classList.remove('open');
-            infoSidebar.classList.add('open');
-        };
-    }
+    // 닫기 버튼들
+    const closeButtons = [
+        { id: 'closeMemberSidebarBtn', sidebar: memberSidebar },
+        { id: 'closeSidebarBtn', sidebar: helpSidebar },
+        { id: 'closeInfoSidebarBtn', sidebar: infoSidebar },
+        { id: 'closeHistorySidebarBtn', sidebar: historySidebar }
+    ];
 
-    if (infoCloseBtn && infoSidebar) {
-        infoCloseBtn.onclick = () => {
-            infoSidebar.classList.remove('open');
-        };
-    }
+    closeButtons.forEach(config => {
+        const btn = document.getElementById(config.id);
+        if (btn) {
+            btn.onclick = () => {
+                if (config.sidebar) config.sidebar.classList.remove('open');
+            };
+        }
+    });
 
     styleButtonsInitialized = true;
 }

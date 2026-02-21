@@ -55,11 +55,16 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
         if (!selection || selection.rangeCount === 0) return 0
         const range = selection.getRangeAt(0)
 
-        // Simple text offset calculation
-        const preCaretRange = range.cloneRange()
-        preCaretRange.selectNodeContents(element)
-        preCaretRange.setEnd(range.endContainer, range.endOffset)
-        return preCaretRange.toString().length
+        // HTML-aware marker trick
+        const marker = document.createElement('span')
+        marker.id = 'yjs-temp-marker'
+        range.insertNode(marker)
+
+        const index = element.innerHTML.indexOf('<span id="yjs-temp-marker"></span>')
+        marker.remove()
+
+        // Handle cases where range.insertNode might fail or return weird index
+        return index >= 0 ? index : 0
     }
 
     const updateRelativeCursor = () => {
@@ -69,11 +74,10 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
         if (isFocued && !isRemoteUpdate) {
             const index = getCursorIndex(editorElement)
             try {
-                // Assoc 0: bind to the right character (or next character)
-                // This typically handles insertions *before* the cursor better in some cases
+                // Now index refers to innerHTML position
                 savedRelativeCursor = Y.createRelativePositionFromTypeIndex(ytext, index, 0)
                 awareness.setLocalStateField('cursor', {
-                    index: index,
+                    index: index, // This will be slightly off for remote markers since it's HTML index, but good enough for now
                     updatedAt: Date.now()
                 })
             } catch (e) {
@@ -84,39 +88,37 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
 
     // --- HELPER: Coordinates for Remote Cursors ---
     const getCoordinatesAtIndex = (element, index) => {
-        // Create a range to find the rect
         try {
-            const range = document.createRange()
-            const treeWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false)
-            let charCount = 0
-            let found = false
+            const html = element.innerHTML
+            const markerTag = '<span id="yjs-remote-marker-temp"></span>'
+            const markedHTML = html.slice(0, index) + markerTag + html.slice(index)
 
-            while (treeWalker.nextNode()) {
-                const node = treeWalker.currentNode
-                const len = node.textContent.length
-                if (charCount + len >= index) {
-                    range.setStart(node, Math.max(0, index - charCount))
-                    range.collapse(true)
-                    found = true
-                    break
-                }
-                charCount += len
-            }
+            // We need to restore the selection if we are modifying innerHTML temporarily
+            const selection = window.getSelection()
+            const ranges = []
+            for (let i = 0; i < selection.rangeCount; i++) ranges.push(selection.getRangeAt(i))
 
-            if (!found) {
-                // If index is out of bounds (e.g. at end), select end
-                range.selectNodeContents(element)
-                range.collapse(false)
-            }
+            const oldHTML = element.innerHTML
+            element.innerHTML = markedHTML
 
-            const rects = range.getClientRects()
-            if (rects.length > 0) {
-                return {
-                    top: rects[0].top + window.scrollY,
-                    left: rects[0].left + window.scrollX,
-                    height: rects[0].height
+            const marker = element.querySelector('#yjs-remote-marker-temp')
+            let coords = null
+            if (marker) {
+                const rect = marker.getBoundingClientRect()
+                coords = {
+                    top: rect.top + window.scrollY,
+                    left: rect.left + window.scrollX,
+                    height: rect.height
                 }
             }
+
+            element.innerHTML = oldHTML
+
+            // Restore selection
+            selection.removeAllRanges()
+            ranges.forEach(r => selection.addRange(r))
+
+            return coords
         } catch (e) {
             // console.warn('Could not calculate coordinates', e)
         }
@@ -241,35 +243,37 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
 
         if (currentContent !== newContent) {
             isRemoteUpdate = true
-            // Save cursor
-            const currentIndex = getCursorIndex(editorElement)
+
+            let markedHTML = newContent
+            let markerAdded = false
+
+            // Calculate new cursor index from relative position
+            if (savedRelativeCursor) {
+                const absPos = Y.createAbsolutePositionFromRelativePosition(savedRelativeCursor, ydoc)
+                if (absPos && absPos.type === ytext) {
+                    const index = absPos.index
+                    const markerTag = '<span id="yjs-restore-marker"></span>'
+                    markedHTML = newContent.slice(0, index) + markerTag + newContent.slice(index)
+                    markerAdded = true
+                }
+            }
 
             // Update Content
-            editorElement.innerHTML = newContent
+            editorElement.innerHTML = markedHTML
             lastSyncedContent = newContent
 
-            // Restore Cursor (best effort)
-            // Note: simple text index restore might fail if HTML structure changed significantly
-            // Restore Cursor (best effort)
-            try {
-                // setCursorIndex(editorElement, currentIndex) // Don't set fallback immediately to avoid jumpiness if relative works
-
-                let restored = false
-                if (savedRelativeCursor) {
-                    const absPos = Y.createAbsolutePositionFromRelativePosition(savedRelativeCursor, ydoc)
-                    if (absPos) {
-                        console.log(`Restoring cursor from relative pos: ${absPos.index} (Fallback was ${currentIndex})`)
-                        setCursorIndex(editorElement, absPos.index)
-                        restored = true
-                    }
+            // Restore Cursor via Marker
+            if (markerAdded) {
+                const marker = editorElement.querySelector('#yjs-restore-marker')
+                if (marker) {
+                    const range = document.createRange()
+                    const selection = window.getSelection()
+                    range.setStartAfter(marker)
+                    range.collapse(true)
+                    selection.removeAllRanges()
+                    selection.addRange(range)
+                    marker.remove()
                 }
-
-                if (!restored) {
-                    console.log(`Restoring cursor from fallback index: ${currentIndex}`)
-                    setCursorIndex(editorElement, currentIndex)
-                }
-            } catch (e) {
-                console.error('Cursor restore failed', e)
             }
 
             isRemoteUpdate = false
@@ -292,7 +296,7 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
                     index += value.length
                 } else if (type === -1) { // Delete
                     ytext.delete(index, value.length)
-                    addSharedLogEntry('delete', 'deleted content')
+                    addSharedLogEntry('delete', value)
                 } else if (type === 1) { // Insert
                     ytext.insert(index, value)
                     addSharedLogEntry('insert', value)
