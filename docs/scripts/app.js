@@ -1192,13 +1192,11 @@ async function backToMainMenu() {
 // 기존 saveNoteBtn 대신 새로운 버튼들 연결
 const onlineSaveBtn = document.getElementById('onlineSaveBtn');
 const ntSaveBtn = document.getElementById('ntSaveBtn');
-const pdfSaveBtn = document.getElementById('pdfSaveBtn');
-const wordSaveBtn = document.getElementById('wordSaveBtn');
+const htmlSaveBtn = document.getElementById('htmlSaveBtn');
 
 if (onlineSaveBtn) onlineSaveBtn.onclick = (e) => { e.stopPropagation(); saveNote(true); };
 if (ntSaveBtn) ntSaveBtn.onclick = (e) => { e.stopPropagation(); exportNt(); };
-if (pdfSaveBtn) pdfSaveBtn.onclick = (e) => { e.stopPropagation(); exportPdf(); };
-if (wordSaveBtn) wordSaveBtn.onclick = (e) => { e.stopPropagation(); exportDocx(); };
+if (htmlSaveBtn) htmlSaveBtn.onclick = (e) => { e.stopPropagation(); exportHtml(); };
 
 document.getElementById('onlineLoadBtn').onclick = () => openOnlineLoadModal();
 document.getElementById('localLoadBtn').onclick = () => document.getElementById('localFileInput').click();
@@ -1229,117 +1227,13 @@ function exportNt() {
     downloadFile(editor.innerHTML, `${title}.nt`, 'text/html');
 }
 
-function exportDocx() {
+function exportHtml() {
     const editor = document.querySelector('.content');
     const title = editor.dataset.noteTitle || 'note';
-
-    // HTML을 Word가 인식하는 형식으로 감싸기
-    const preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML to Word Document with JavaScript</title><style>body{font-family:'Noto Sans KR', sans-serif;} p{margin-bottom:10px;}</style></head><body>";
-    const postHtml = "</body></html>";
-
-    // 내용 결합
-    const html = preHtml + editor.innerHTML + postHtml;
-
-    // Blob 생성 (MS Word MIME type)
-    const blob = new Blob(['\ufeff', html], {
-        type: 'application/msword'
-    });
-
-    // 다운로드 링크 생성
-    const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
-
-    // navigator.msSaveOrOpenBlob IE support, else downloadFile logic
-    const downloadLink = document.createElement("a");
-    document.body.appendChild(downloadLink);
-
-    if (navigator.msSaveOrOpenBlob) {
-        navigator.msSaveOrOpenBlob(blob, `${title}.doc`);
-    } else {
-        downloadLink.href = url;
-        downloadLink.download = `${title}.doc`;
-        downloadLink.click();
-    }
-
-    document.body.removeChild(downloadLink);
+    downloadFile(editor.innerHTML, `${title}.html`, 'text/html');
 }
 
-async function exportPdf() {
-    const editor = document.querySelector('.content');
-    const title = editor.dataset.noteTitle || 'note';
 
-    const tempWrapper = document.createElement('div');
-    tempWrapper.id = 'pdf-temp-wrapper';
-    tempWrapper.style.padding = '40px';
-    tempWrapper.style.background = '#fff';
-    tempWrapper.style.width = '750px';
-
-    // 🔥 핵심
-    tempWrapper.style.position = 'absolute';
-    tempWrapper.style.top = '0';
-    tempWrapper.style.left = '0';
-    tempWrapper.style.zIndex = '-1';   // 화면 뒤로만 보냄
-    tempWrapper.style.color = '#000';
-    tempWrapper.style.fontFamily = '"Noto Sans KR", Arial, sans-serif';
-
-    tempWrapper.innerHTML = editor.innerHTML;
-    document.body.appendChild(tempWrapper);
-
-    // ✅ 이미지 로딩 대기 (안 기다리면 빈 캔버스 나올 때 있음)
-    const imgs = [...tempWrapper.querySelectorAll('img')];
-    await Promise.all(imgs.map(img => new Promise(res => {
-        if (img.complete) return res();
-        img.onload = () => res();
-        img.onerror = () => res();
-    })));
-
-    // ✅ 이미지가 있는 경우 scale을 낮추는 게 안정적임
-    // (이미지가 없으면 scale 2도 괜찮음)
-    const hasImage = imgs.length > 0;
-    const scaleValue = hasImage ? 1 : 2;
-
-    const opt = {
-        margin: [15, 15, 15, 15],
-        filename: `${title}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: {
-            scale: scaleValue,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-
-            onclone: (clonedDoc) => {
-                const w = clonedDoc.querySelector('#pdf-temp-wrapper');
-                if (!w) return;
-
-                // ❌ transform / opacity / visibility 만지지 마
-                w.style.position = 'relative';
-                w.style.background = '#fff';
-                w.style.color = '#000';
-
-                // 이미지 안정화
-                w.querySelectorAll('img').forEach(img => {
-                    img.style.maxWidth = '100%';
-                    img.style.height = 'auto';
-                    img.style.display = 'block';
-                });
-            }
-
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-    };
-
-    try {
-        showNotification("PDF 저장 중...");
-        await html2pdf().set(opt).from(tempWrapper).save();
-        showNotification("PDF 저장이 완료되었습니다.");
-    } catch (err) {
-        console.error("PDF Export Error:", err);
-        alert("PDF 생성 중 오류가 발생했습니다.");
-    } finally {
-        tempWrapper.remove();
-    }
-}
 
 
 
