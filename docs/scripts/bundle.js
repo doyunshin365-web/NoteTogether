@@ -1040,7 +1040,7 @@
   var LOWEST_INT32 = 1 << 31;
   var isInteger = Number.isInteger || ((num) => typeof num === "number" && isFinite(num) && floor(num) === num);
   var isNaN2 = Number.isNaN;
-  var parseInt = Number.parseInt;
+  var parseInt2 = Number.parseInt;
 
   // node_modules/lib0/string.js
   var fromCharCode = String.fromCharCode;
@@ -10108,61 +10108,48 @@ ${reason}`);
     let isRemoteUpdate = false;
     let savedRelativeCursor = null;
     const MAX_LOGS = 100;
+    const MARKER_SENTINEL = "YJS_CURSOR_MARKER_SENTINEL";
     const getCursorIndex = (element2) => {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return 0;
       const range = selection.getRangeAt(0);
       const marker = document.createElement("span");
       marker.id = "yjs-temp-marker";
-      range.insertNode(marker);
-      const index = element2.innerHTML.indexOf('<span id="yjs-temp-marker"></span>');
-      marker.remove();
-      return index >= 0 ? index : 0;
+      marker.textContent = MARKER_SENTINEL;
+      try {
+        range.insertNode(marker);
+        const html = element2.innerHTML;
+        const searchStr = `>${MARKER_SENTINEL}<`;
+        const pos = html.indexOf(searchStr);
+        marker.remove();
+        if (pos >= 0) {
+          const tagStart = html.lastIndexOf("<", pos);
+          return tagStart >= 0 ? tagStart : 0;
+        }
+        return 0;
+      } catch (e) {
+        try {
+          marker.remove();
+        } catch (_) {
+        }
+        return 0;
+      }
     };
     const updateRelativeCursor = () => {
       const selection = window.getSelection();
-      const isFocued = document.activeElement === editorElement || selection.rangeCount > 0 && editorElement.contains(selection.anchorNode);
-      if (isFocued && !isRemoteUpdate) {
+      const isFocused = document.activeElement === editorElement || selection.rangeCount > 0 && editorElement.contains(selection.anchorNode);
+      if (isFocused && !isRemoteUpdate) {
         const index = getCursorIndex(editorElement);
         try {
           savedRelativeCursor = createRelativePositionFromTypeIndex(ytext, index, 0);
           awareness.setLocalStateField("cursor", {
             index,
-            // This will be slightly off for remote markers since it's HTML index, but good enough for now
             updatedAt: Date.now()
           });
         } catch (e) {
           console.error("Failed to save relative cursor", e);
         }
       }
-    };
-    const getCoordinatesAtIndex = (element2, index) => {
-      try {
-        const html = element2.innerHTML;
-        const markerTag = '<span id="yjs-remote-marker-temp"></span>';
-        const markedHTML = html.slice(0, index) + markerTag + html.slice(index);
-        const selection = window.getSelection();
-        const ranges = [];
-        for (let i = 0; i < selection.rangeCount; i++) ranges.push(selection.getRangeAt(i));
-        const oldHTML = element2.innerHTML;
-        element2.innerHTML = markedHTML;
-        const marker = element2.querySelector("#yjs-remote-marker-temp");
-        let coords = null;
-        if (marker) {
-          const rect = marker.getBoundingClientRect();
-          coords = {
-            top: rect.top + window.scrollY,
-            left: rect.left + window.scrollX,
-            height: rect.height
-          };
-        }
-        element2.innerHTML = oldHTML;
-        selection.removeAllRanges();
-        ranges.forEach((r) => selection.addRange(r));
-        return coords;
-      } catch (e) {
-      }
-      return null;
     };
     const cursorContainer = document.createElement("div");
     cursorContainer.id = "yjs-cursor-container";
@@ -10172,36 +10159,76 @@ ${reason}`);
     cursorContainer.style.pointerEvents = "none";
     cursorContainer.style.zIndex = "9999";
     document.body.appendChild(cursorContainer);
+    let renderRequested = false;
     const renderRemoteCursors = () => {
-      cursorContainer.innerHTML = "";
-      const states = awareness.getStates();
-      states.forEach((state, clientID) => {
-        if (clientID === ydoc.clientID) return;
-        if (!state.user || !state.cursor) return;
-        const coords = getCoordinatesAtIndex(editorElement, state.cursor.index);
-        if (coords) {
-          const cursorDiv = document.createElement("div");
-          cursorDiv.className = "remote-cursor";
-          cursorDiv.style.position = "absolute";
-          cursorDiv.style.left = `${coords.left}px`;
-          cursorDiv.style.top = `${coords.top}px`;
-          cursorDiv.style.height = `${coords.height || 20}px`;
-          cursorDiv.style.borderLeft = `2px solid ${state.user.color}`;
-          cursorDiv.style.pointerEvents = "none";
-          const labelDiv = document.createElement("div");
-          labelDiv.textContent = state.user.name;
-          labelDiv.style.position = "absolute";
-          labelDiv.style.top = "-1.5em";
-          labelDiv.style.left = "-2px";
-          labelDiv.style.backgroundColor = state.user.color;
-          labelDiv.style.color = "white";
-          labelDiv.style.fontSize = "12px";
-          labelDiv.style.padding = "2px 4px";
-          labelDiv.style.borderRadius = "4px";
-          labelDiv.style.whiteSpace = "nowrap";
-          cursorDiv.appendChild(labelDiv);
-          cursorContainer.appendChild(cursorDiv);
+      if (renderRequested) return;
+      renderRequested = true;
+      requestAnimationFrame(() => {
+        renderRequested = false;
+        const states = awareness.getStates();
+        const cursorsToRender = [];
+        states.forEach((state, clientID) => {
+          if (clientID === ydoc.clientID) return;
+          if (!state.user || !state.cursor) return;
+          cursorsToRender.push({ state, clientID });
+        });
+        if (cursorsToRender.length === 0) {
+          cursorContainer.innerHTML = "";
+          return;
         }
+        const html = editorElement.innerHTML;
+        const sorted = [...cursorsToRender].sort((a, b) => b.state.cursor.index - a.state.cursor.index);
+        let markedHTML = html;
+        const markerInfos = [];
+        sorted.forEach((c) => {
+          const markerId = `yjs-m-${c.clientID}`;
+          const markerTag = `<span id="${markerId}" style="display:inline-block;width:0;height:1em;overflow:hidden;"></span>`;
+          const idx = Math.min(Math.max(c.state.cursor.index, 0), markedHTML.length);
+          markedHTML = markedHTML.slice(0, idx) + markerTag + markedHTML.slice(idx);
+          markerInfos.push({ id: markerId, user: c.state.user });
+        });
+        const editorRect = editorElement.getBoundingClientRect();
+        const editorStyle = window.getComputedStyle(editorElement);
+        const offscreen = document.createElement("div");
+        offscreen.style.cssText = [
+          "position:fixed",
+          `left:${editorRect.left}px`,
+          `top:${editorRect.top}px`,
+          `width:${editorRect.width}px`,
+          `min-height:${editorRect.height}px`,
+          "overflow:hidden",
+          "visibility:hidden",
+          "pointer-events:none",
+          "z-index:-1",
+          `font-family:${editorStyle.fontFamily}`,
+          `font-size:${editorStyle.fontSize}`,
+          `line-height:${editorStyle.lineHeight}`,
+          `white-space:${editorStyle.whiteSpace}`,
+          `word-break:${editorStyle.wordBreak}`,
+          `padding:${editorStyle.padding}`,
+          `box-sizing:${editorStyle.boxSizing}`
+        ].join(";");
+        offscreen.innerHTML = markedHTML;
+        document.body.appendChild(offscreen);
+        const newCursorsHTML = [];
+        markerInfos.forEach((m) => {
+          try {
+            const marker = offscreen.querySelector(`#${m.id}`);
+            if (!marker) return;
+            const rect = marker.getBoundingClientRect();
+            if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) return;
+            const top = rect.top + window.scrollY;
+            const left = rect.left + window.scrollX;
+            const height = rect.height || parseInt(editorStyle.lineHeight) || 20;
+            const safeName = (m.user.name || "User").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            newCursorsHTML.push(
+              `<div class="remote-cursor" style="position:absolute;left:${left}px;top:${top}px;height:${height}px;border-left:2px solid ${m.user.color};pointer-events:none;transition:left .1s ease-out,top .1s ease-out;"><div style="position:absolute;top:-1.5em;left:-2px;background:${m.user.color};color:white;font-size:12px;padding:2px 4px;border-radius:4px;white-space:nowrap;">${safeName}</div></div>`
+            );
+          } catch (e) {
+          }
+        });
+        document.body.removeChild(offscreen);
+        cursorContainer.innerHTML = newCursorsHTML.join("");
       });
     };
     awareness.on("change", renderRemoteCursors);
@@ -10227,30 +10254,6 @@ ${reason}`);
         onLogUpdate(yLog.toArray().slice().reverse());
       }
     });
-    const setCursorIndex = (element2, index) => {
-      const range = document.createRange();
-      const selection = window.getSelection();
-      const treeWalker = document.createTreeWalker(element2, NodeFilter.SHOW_TEXT, null, false);
-      let charCount = 0;
-      let found = false;
-      while (treeWalker.nextNode()) {
-        const node = treeWalker.currentNode;
-        const len = node.textContent.length;
-        if (charCount + len >= index) {
-          range.setStart(node, Math.max(0, index - charCount));
-          range.collapse(true);
-          found = true;
-          break;
-        }
-        charCount += len;
-      }
-      if (!found) {
-        range.selectNodeContents(element2);
-        range.collapse(false);
-      }
-      selection.removeAllRanges();
-      selection.addRange(range);
-    };
     const updateDOMFromYjs = () => {
       if (isComposing || isLocalUpdate) return;
       const newContent = ytext.toString();

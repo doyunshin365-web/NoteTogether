@@ -14,20 +14,18 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     const ydoc = new Y.Doc()
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsHost = window.location.host
-    // Connect to the server. Note: server.js handles '/yjs' prefix upgrade
     const provider = new WebsocketProvider(`${wsProtocol}//${wsHost}/yjs`, noteId, ydoc)
 
     provider.on('status', event => {
-        console.log('Yjs WebSocket status:', event.status) // 'connected', 'disconnected', 'connecting'
+        console.log('Yjs WebSocket status:', event.status)
     })
 
     provider.on('sync', isSynced => {
         console.log('Yjs synced:', isSynced)
     })
 
-
-    const ytext = ydoc.getText('content') // Main content
-    const yLog = ydoc.getArray('shared-log') // Shared logs
+    const ytext = ydoc.getText('content')
+    const yLog = ydoc.getArray('shared-log')
 
     // --- AWARENESS ---
     const awareness = provider.awareness
@@ -47,83 +45,64 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     let savedRelativeCursor = null
     const MAX_LOGS = 100
 
-    // --- HELPER: Cursor Index (ContentEditable) ---
-    // Note: This matches the raw text offset logic from CRDT_Test. 
-    // Ideally should be adapted for HTML structure if possible, but start with text offset for stability.
+    // --- HELPER: Get cursor index in innerHTML terms ---
+    // Inserts a temporary marker span into the DOM at the caret position,
+    // reads its index in innerHTML, then removes it.
+    // Uses a sentinel string in textContent to survive browser normalisation.
+    const MARKER_SENTINEL = 'YJS_CURSOR_MARKER_SENTINEL'
     const getCursorIndex = (element) => {
         const selection = window.getSelection()
         if (!selection || selection.rangeCount === 0) return 0
         const range = selection.getRangeAt(0)
 
-        // HTML-aware marker trick
         const marker = document.createElement('span')
         marker.id = 'yjs-temp-marker'
-        range.insertNode(marker)
+        marker.textContent = MARKER_SENTINEL
 
-        const index = element.innerHTML.indexOf('<span id="yjs-temp-marker"></span>')
-        marker.remove()
-
-        // Handle cases where range.insertNode might fail or return weird index
-        return index >= 0 ? index : 0
+        try {
+            range.insertNode(marker)
+            const html = element.innerHTML
+            // Look for any variation of the marker (browser may reformat attributes)
+            const searchStr = `>${MARKER_SENTINEL}<`
+            const pos = html.indexOf(searchStr)
+            marker.remove()
+            if (pos >= 0) {
+                // Return the position of the opening tag bracket before the sentinel
+                const tagStart = html.lastIndexOf('<', pos)
+                return tagStart >= 0 ? tagStart : 0
+            }
+            return 0
+        } catch (e) {
+            try { marker.remove() } catch (_) { }
+            return 0
+        }
     }
 
+    // --- HELPER: Save cursor as Yjs relative position ---
     const updateRelativeCursor = () => {
         const selection = window.getSelection()
-        const isFocued = document.activeElement === editorElement || (selection.rangeCount > 0 && editorElement.contains(selection.anchorNode))
+        const isFocused = document.activeElement === editorElement ||
+            (selection.rangeCount > 0 && editorElement.contains(selection.anchorNode))
 
-        if (isFocued && !isRemoteUpdate) {
+        if (isFocused && !isRemoteUpdate) {
             const index = getCursorIndex(editorElement)
             try {
-                // Now index refers to innerHTML position
                 savedRelativeCursor = Y.createRelativePositionFromTypeIndex(ytext, index, 0)
                 awareness.setLocalStateField('cursor', {
-                    index: index, // This will be slightly off for remote markers since it's HTML index, but good enough for now
+                    index: index,
                     updatedAt: Date.now()
                 })
             } catch (e) {
-                console.error("Failed to save relative cursor", e)
+                console.error('Failed to save relative cursor', e)
             }
         }
     }
 
-    // --- HELPER: Coordinates for Remote Cursors ---
-    const getCoordinatesAtIndex = (element, index) => {
-        try {
-            const html = element.innerHTML
-            const markerTag = '<span id="yjs-remote-marker-temp"></span>'
-            const markedHTML = html.slice(0, index) + markerTag + html.slice(index)
-
-            // We need to restore the selection if we are modifying innerHTML temporarily
-            const selection = window.getSelection()
-            const ranges = []
-            for (let i = 0; i < selection.rangeCount; i++) ranges.push(selection.getRangeAt(i))
-
-            const oldHTML = element.innerHTML
-            element.innerHTML = markedHTML
-
-            const marker = element.querySelector('#yjs-remote-marker-temp')
-            let coords = null
-            if (marker) {
-                const rect = marker.getBoundingClientRect()
-                coords = {
-                    top: rect.top + window.scrollY,
-                    left: rect.left + window.scrollX,
-                    height: rect.height
-                }
-            }
-
-            element.innerHTML = oldHTML
-
-            // Restore selection
-            selection.removeAllRanges()
-            ranges.forEach(r => selection.addRange(r))
-
-            return coords
-        } catch (e) {
-            // console.warn('Could not calculate coordinates', e)
-        }
-        return null
-    }
+    // --- REMOTE CURSOR RENDERING (off-screen clone approach) ---
+    // IMPORTANT: We NEVER modify editorElement.innerHTML here.
+    // Doing so would trigger input/selectionchange events → syncLocalToRemote → duplicate text.
+    // Instead we clone the editor into a hidden off-screen div, insert markers there,
+    // read coordinates, then discard the clone.
 
     const cursorContainer = document.createElement('div')
     cursorContainer.id = 'yjs-cursor-container'
@@ -134,40 +113,100 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     cursorContainer.style.zIndex = '9999'
     document.body.appendChild(cursorContainer)
 
+    let renderRequested = false
     const renderRemoteCursors = () => {
-        cursorContainer.innerHTML = ''
-        const states = awareness.getStates()
+        if (renderRequested) return
+        renderRequested = true
 
-        states.forEach((state, clientID) => {
-            if (clientID === ydoc.clientID) return
-            if (!state.user || !state.cursor) return
+        requestAnimationFrame(() => {
+            renderRequested = false
+            const states = awareness.getStates()
+            const cursorsToRender = []
 
-            const coords = getCoordinatesAtIndex(editorElement, state.cursor.index)
-            if (coords) {
-                const cursorDiv = document.createElement('div')
-                cursorDiv.className = 'remote-cursor'
-                cursorDiv.style.position = 'absolute'
-                cursorDiv.style.left = `${coords.left}px`
-                cursorDiv.style.top = `${coords.top}px`
-                cursorDiv.style.height = `${coords.height || 20}px`
-                cursorDiv.style.borderLeft = `2px solid ${state.user.color}`
-                cursorDiv.style.pointerEvents = 'none'
+            states.forEach((state, clientID) => {
+                if (clientID === ydoc.clientID) return
+                if (!state.user || !state.cursor) return
+                cursorsToRender.push({ state, clientID })
+            })
 
-                const labelDiv = document.createElement('div')
-                labelDiv.textContent = state.user.name
-                labelDiv.style.position = 'absolute'
-                labelDiv.style.top = '-1.5em'
-                labelDiv.style.left = '-2px'
-                labelDiv.style.backgroundColor = state.user.color
-                labelDiv.style.color = 'white'
-                labelDiv.style.fontSize = '12px'
-                labelDiv.style.padding = '2px 4px'
-                labelDiv.style.borderRadius = '4px'
-                labelDiv.style.whiteSpace = 'nowrap'
-
-                cursorDiv.appendChild(labelDiv)
-                cursorContainer.appendChild(cursorDiv)
+            if (cursorsToRender.length === 0) {
+                cursorContainer.innerHTML = ''
+                return
             }
+
+            // Build a marked-up HTML string with all cursors embedded (descending order
+            // so earlier indices aren't shifted by later insertions)
+            const html = editorElement.innerHTML
+            const sorted = [...cursorsToRender].sort((a, b) => b.state.cursor.index - a.state.cursor.index)
+
+            let markedHTML = html
+            const markerInfos = []
+
+            sorted.forEach(c => {
+                const markerId = `yjs-m-${c.clientID}`
+                // Visible but zero-size span so getBoundingClientRect has a real size
+                const markerTag = `<span id="${markerId}" style="display:inline-block;width:0;height:1em;overflow:hidden;"></span>`
+                const idx = Math.min(Math.max(c.state.cursor.index, 0), markedHTML.length)
+                markedHTML = markedHTML.slice(0, idx) + markerTag + markedHTML.slice(idx)
+                markerInfos.push({ id: markerId, user: c.state.user })
+            })
+
+            // Mirror the editor's exact layout in an off-screen container
+            const editorRect = editorElement.getBoundingClientRect()
+            const editorStyle = window.getComputedStyle(editorElement)
+
+            const offscreen = document.createElement('div')
+            offscreen.style.cssText = [
+                'position:fixed',
+                `left:${editorRect.left}px`,
+                `top:${editorRect.top}px`,
+                `width:${editorRect.width}px`,
+                `min-height:${editorRect.height}px`,
+                'overflow:hidden',
+                'visibility:hidden',
+                'pointer-events:none',
+                'z-index:-1',
+                `font-family:${editorStyle.fontFamily}`,
+                `font-size:${editorStyle.fontSize}`,
+                `line-height:${editorStyle.lineHeight}`,
+                `white-space:${editorStyle.whiteSpace}`,
+                `word-break:${editorStyle.wordBreak}`,
+                `padding:${editorStyle.padding}`,
+                `box-sizing:${editorStyle.boxSizing}`,
+            ].join(';')
+            offscreen.innerHTML = markedHTML
+            document.body.appendChild(offscreen)
+
+            // Read coordinates while markers are present in the clone
+            const newCursorsHTML = []
+            markerInfos.forEach(m => {
+                try {
+                    const marker = offscreen.querySelector(`#${m.id}`)
+                    if (!marker) return
+
+                    const rect = marker.getBoundingClientRect()
+                    // Ignore zero-rect: marker position is unknown or editor not visible
+                    if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) return
+
+                    const top = rect.top + window.scrollY
+                    const left = rect.left + window.scrollX
+                    const height = rect.height || parseInt(editorStyle.lineHeight) || 20
+
+                    // Escape user name for inline HTML
+                    const safeName = (m.user.name || 'User').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+                    newCursorsHTML.push(
+                        `<div class="remote-cursor" style="position:absolute;left:${left}px;top:${top}px;height:${height}px;border-left:2px solid ${m.user.color};pointer-events:none;transition:left .1s ease-out,top .1s ease-out;">` +
+                        `<div style="position:absolute;top:-1.5em;left:-2px;background:${m.user.color};color:white;font-size:12px;padding:2px 4px;border-radius:4px;white-space:nowrap;">${safeName}</div>` +
+                        `</div>`
+                    )
+                } catch (e) { /* skip this cursor */ }
+            })
+
+            // Discard the clone — the real editor is completely untouched
+            document.body.removeChild(offscreen)
+
+            cursorContainer.innerHTML = newCursorsHTML.join('')
         })
     }
 
@@ -179,7 +218,6 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
         const now = new Date()
         const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
 
-        // Truncate text for log
         const displaySafeText = text.length > 20 ? text.substring(0, 20) + '...' : text
 
         ydoc.transact(() => {
@@ -206,35 +244,6 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     // Important: We are syncing `innerHTML` to attempt preservation of rich text structure.
     // WARNING: `fast-diff` on HTML strings is brittle. Ideally a rich-text binding (like Tiptap) should be used.
 
-    const setCursorIndex = (element, index) => {
-        // Restore cursor position based on text offset
-        const range = document.createRange()
-        const selection = window.getSelection()
-        const treeWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false)
-        let charCount = 0
-        let found = false
-
-        while (treeWalker.nextNode()) {
-            const node = treeWalker.currentNode
-            const len = node.textContent.length
-            if (charCount + len >= index) {
-                range.setStart(node, Math.max(0, index - charCount))
-                range.collapse(true)
-                found = true
-                break
-            }
-            charCount += len
-        }
-
-        if (!found) {
-            range.selectNodeContents(element)
-            range.collapse(false)
-        }
-
-        selection.removeAllRanges()
-        selection.addRange(range)
-    }
-
     const updateDOMFromYjs = () => {
         if (isComposing || isLocalUpdate) return
 
@@ -247,7 +256,6 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
             let markedHTML = newContent
             let markerAdded = false
 
-            // Calculate new cursor index from relative position
             if (savedRelativeCursor) {
                 const absPos = Y.createAbsolutePositionFromRelativePosition(savedRelativeCursor, ydoc)
                 if (absPos && absPos.type === ytext) {
@@ -258,11 +266,9 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
                 }
             }
 
-            // Update Content
             editorElement.innerHTML = markedHTML
             lastSyncedContent = newContent
 
-            // Restore Cursor via Marker
             if (markerAdded) {
                 const marker = editorElement.querySelector('#yjs-restore-marker')
                 if (marker) {
@@ -286,18 +292,17 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
         if (localContent === lastSyncedContent) return
 
         isLocalUpdate = true
-        // Diff on innerHTML string
         const changes = diff(lastSyncedContent, localContent)
 
         ydoc.transact(() => {
             let index = 0
             changes.forEach(([type, value]) => {
-                if (type === 0) { // Equal
+                if (type === 0) {
                     index += value.length
-                } else if (type === -1) { // Delete
+                } else if (type === -1) {
                     ytext.delete(index, value.length)
                     addSharedLogEntry('delete', value)
-                } else if (type === 1) { // Insert
+                } else if (type === 1) {
                     ytext.insert(index, value)
                     addSharedLogEntry('insert', value)
                     index += value.length
@@ -314,10 +319,9 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     editorElement.addEventListener('compositionstart', () => { isComposing = true })
     editorElement.addEventListener('compositionend', () => {
         isComposing = false
-        updateDOMFromYjs() // Check if we missed anything
+        updateDOMFromYjs()
     })
 
-    // NoteTogether editor triggers 'input' on change
     editorElement.addEventListener('input', () => {
         syncLocalToRemote()
     })
@@ -329,7 +333,6 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
         }
     })
 
-    // Ensure we track every cursor movement
     document.addEventListener('selectionchange', () => {
         if (document.activeElement === editorElement) {
             updateRelativeCursor()
@@ -337,7 +340,6 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     })
 
     // Initial Sync Logic
-    // Wait for the provider to sync with the server before deciding on content
     provider.once('synced', (isSynced) => {
         console.log('Initial sync complete. Is synced:', isSynced)
 
