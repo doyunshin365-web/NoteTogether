@@ -1451,7 +1451,7 @@ function joinNoteRoom(noteId, userId) {
         const handleSelectionChange = () => {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-                lastSelectedRange = selection.getRangeAt(0).cloneRange();
+                lastSelectionRange = selection.getRangeAt(0).cloneRange();
             }
             sendSelection();
         };
@@ -1766,12 +1766,18 @@ openNoteInEditor = function (note) {
 // === AI 교정 기능 상세 구현 === //
 
 let isAiProofreading = false;
-let lastSelectedRange = null; // 마지막 선택 영역 저장
 const remoteLocks = new Map(); // userId -> mask element
 
 // AI 교정 버튼 클릭
 const aiProofreadBtn = document.getElementById('aiProofreadBtn');
 if (aiProofreadBtn) {
+    aiProofreadBtn.addEventListener('mousedown', (e) => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+            lastSelectionRange = selection.getRangeAt(0).cloneRange();
+        }
+    });
+
     aiProofreadBtn.addEventListener('click', async () => {
         if (isAiProofreading) return;
 
@@ -1779,7 +1785,7 @@ if (aiProofreadBtn) {
         const selection = window.getSelection();
         let range = (selection && selection.rangeCount > 0 && !selection.isCollapsed)
             ? selection.getRangeAt(0)
-            : lastSelectedRange;
+            : lastSelectionRange;
 
         if (!range) {
             alert('교정할 텍스트를 먼저 선택해주세요.');
