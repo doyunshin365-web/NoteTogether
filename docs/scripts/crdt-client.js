@@ -14,7 +14,9 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     const ydoc = new Y.Doc()
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsHost = window.location.host
-    const provider = new WebsocketProvider(`${wsProtocol}//${wsHost}/yjs`, noteId, ydoc)
+    const provider = new WebsocketProvider(`${wsProtocol}//${wsHost}/yjs`, noteId, ydoc, {
+        params: { token: user.token || '' }
+    })
 
     provider.on('status', event => {
         console.log('Yjs WebSocket status:', event.status)

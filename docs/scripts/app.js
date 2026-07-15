@@ -13,26 +13,34 @@ let menu_item = document.querySelector('#mainmenu_item4');
 let register_btn = document.querySelector('#register_submit');
 const addNewNoteBtn = document.querySelector('.add_new_note');
 
-// === Cookie Helpers === //
-function setCookie(name, value, days) {
-    let expires = "";
-    if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toGMTString();
+// === JWT Auth Helpers === //
+let authToken = localStorage.getItem('auth_token') || null;
+
+// 인증이 필요한 요청에 자동으로 Authorization 헤더를 붙여 fetch를 수행
+async function authFetch(url, options = {}) {
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    const response = await fetch(url, Object.assign({}, options, { headers }));
+    if (response.status === 401 || response.status === 403) {
+        handleAuthExpired();
     }
-    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    return response;
 }
 
-function getCookie(name) {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+// 토큰이 만료되었거나 무효할 때 로그인 화면으로 되돌림
+function handleAuthExpired() {
+    authToken = null;
+    loggedInUserId = null;
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_desc');
+    if (socket) {
+        socket.disconnect();
+        socket = null;
     }
-    return null;
+    safeDisplay(main_div, 'none');
+    safeDisplay(login_div, 'block');
 }
 
 
@@ -115,17 +123,14 @@ async function performLogin(id, pw, isAuto = false) {
             login_div.style.display = 'none';
             main_div.style.display = 'block';
 
+            authToken = data.token;
+            localStorage.setItem('auth_token', authToken);
             localStorage.setItem('user_id', id);
             localStorage.setItem('user_desc', data.desc);
             loggedInUserId = id;
 
             const usernameEl = document.querySelector('.username');
             if (usernameEl) usernameEl.textContent = id;
-
-            // 쿠키 저장 (id, pw, timestamp)
-            setCookie('auto_login_id', id, 365);
-            setCookie('auto_login_pw', pw, 365);
-            setCookie('auto_login_time', Date.now(), 365);
 
             initializeSocket();
             loadUserNotes();
@@ -153,26 +158,36 @@ login_btn.addEventListener('click', async () => {
     await performLogin(id, pw);
 });
 
-// Auto-login on load
+// Auto-login on load (저장된 JWT로 세션 복원 - 비밀번호는 다시 보관하지 않음)
 window.addEventListener('DOMContentLoaded', async () => {
-    const savedId = getCookie('auto_login_id');
-    const savedPw = getCookie('auto_login_pw');
-    const savedTime = getCookie('auto_login_time');
+    if (!authToken) return;
 
-    if (savedId && savedPw && savedTime) {
-        const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
-        const diff = now - parseInt(savedTime);
+    try {
+        console.log("Attempting to restore session from stored token...");
+        const response = await authFetch('/me', { method: 'GET' });
+        const data = await response.json();
 
-        if (diff < oneYearInMs) {
-            console.log("Attempting auto-login...");
-            const success = await performLogin(savedId, savedPw, true);
-            if (!success) {
-                console.log("Auto-login failed. Please login manually.");
-            }
+        if (data.message === "2") {
+            login_div.style.display = 'none';
+            main_div.style.display = 'block';
+
+            loggedInUserId = data.id;
+            localStorage.setItem('user_id', data.id);
+            localStorage.setItem('user_desc', data.desc);
+
+            const usernameEl = document.querySelector('.username');
+            if (usernameEl) usernameEl.textContent = data.id;
+
+            initializeSocket();
+            loadUserNotes();
+            loadWorkspaces();
+            loadInvitations();
         } else {
-            console.log("Auto-login expired (1 year). Please login manually.");
+            console.log("Stored token is no longer valid. Please login manually.");
+            handleAuthExpired();
         }
+    } catch (error) {
+        console.error("Session restore error:", error);
     }
 });
 
@@ -912,10 +927,9 @@ async function loadUserNotes() {
     if (!userId) return;
 
     try {
-        const response = await fetch('/get_notes', {
+        const response = await authFetch('/get_notes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId }),
+            body: JSON.stringify({}),
         });
 
         const data = await response.json();
@@ -1021,7 +1035,8 @@ function openNoteInEditor(note) {
         // User info from global state (loggedInUserId is set on login)
         const user = {
             id: loggedInUserId || 'Anonymous',
-            name: loggedInUserId || 'Anonymous'
+            name: loggedInUserId || 'Anonymous',
+            token: authToken
             // color handled by crdt-client if missing
         };
 
@@ -1067,9 +1082,8 @@ async function saveNote(showAlert = false) {
             autoSaveStatus.style.color = '#2487ac';
         }
 
-        const response = await fetch('/save_note', {
+        const response = await authFetch('/save_note', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ noteId, contents }),
         });
 
@@ -1172,7 +1186,7 @@ async function backToMainMenu() {
 
     // 3. 소켓 방 퇴장 (필요시)
     if (socket && currentNoteId && loggedInUserId) {
-        socket.emit('leave-note', { noteId: currentNoteId, userId: loggedInUserId });
+        socket.emit('leave-note', { noteId: currentNoteId });
     }
 
     // 4. 화면 전환
@@ -1318,13 +1332,18 @@ window.addEventListener('beforeunload', (e) => {
 // Socket.io 연결
 function initializeSocket() {
     if (socket) return;
+    if (!authToken) return;
 
-    socket = io();
+    socket = io({ auth: { token: authToken } });
 
     socket.on('connect', () => {
         console.log('Socket connected:', socket.id);
-        if (loggedInUserId) {
-            socket.emit('register-user', loggedInUserId);
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Socket connect error:', err.message);
+        if (err.message === 'Invalid or expired token' || err.message === 'Authentication required') {
+            handleAuthExpired();
         }
     });
 
@@ -1332,6 +1351,12 @@ function initializeSocket() {
     socket.on('workspace-invite', ({ workspaceId, name }) => {
         showNotification(`'${name}' 워크스페이스에 초대되었습니다!`);
         loadInvitations(); // 초대 목록 갱신
+    });
+
+    // 노트 접근 권한 없음 (예: 초대되지 않은 노트에 접근 시도)
+    socket.on('note-access-denied', () => {
+        showNotification('이 노트에 접근할 권한이 없습니다.');
+        backToMainMenu();
     });
 
     // 새 사용자 참여
@@ -1410,7 +1435,7 @@ function joinNoteRoom(noteId, userId) {
         initializeSocket();
     }
 
-    socket.emit('join-note', { noteId, userId });
+    socket.emit('join-note', { noteId });
 
     // 에디터 이벤트 리스너 추가 (중복 방지)
     const editor = document.querySelector('.content');
@@ -1728,9 +1753,8 @@ if (addMemberBtn) {
         const noteId = editor.dataset.noteId;
 
         try {
-            const response = await fetch('/add_member', {
+            const response = await authFetch('/add_member', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ noteId, userId }),
             });
 
@@ -1823,13 +1847,11 @@ if (aiProofreadBtn) {
             showLockOverlay('나', relativeRange, true);
 
             // AI 교정 요청
-            const response = await fetch('/ai-proofread', {
+            const response = await authFetch('/ai-proofread', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: selectedText,
                     instruction: instruction,
-                    userId: currentUserId,
                     noteId: currentNoteId
                 })
             });
@@ -1982,10 +2004,9 @@ document.head.appendChild(style);
 async function loadWorkspaces() {
     if (!loggedInUserId) return;
     try {
-        const response = await fetch('/get_workspaces', {
+        const response = await authFetch('/get_workspaces', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: loggedInUserId })
+            body: JSON.stringify({})
         });
         const data = await response.json();
         if (data.message === "1") {
@@ -2002,10 +2023,9 @@ async function loadWorkspaces() {
 async function loadInvitations() {
     if (!loggedInUserId) return;
     try {
-        const response = await fetch('/get_workspaces', {
+        const response = await authFetch('/get_workspaces', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: loggedInUserId })
+            body: JSON.stringify({})
         });
         const data = await response.json();
         if (data.message === "1") {
@@ -2082,10 +2102,9 @@ function renderInvitations() {
 // 초대 응답
 async function respondInvitation(workspaceId, response) {
     try {
-        const res = await fetch('/respond_to_invitation', {
+        const res = await authFetch('/respond_to_invitation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workspaceId, userId: loggedInUserId, response })
+            body: JSON.stringify({ workspaceId, response })
         });
         const data = await res.json();
         if (data.message === "1") {
@@ -2123,10 +2142,9 @@ if (submitWorkspaceBtn) {
         if (!name) return alert("워크스페이스 이름을 입력하세요.");
 
         try {
-            const response = await fetch('/create_workspace', {
+            const response = await authFetch('/create_workspace', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, ownerId: loggedInUserId })
+                body: JSON.stringify({ name })
             });
             const data = await response.json();
             if (data.message === "1") {
@@ -2168,9 +2186,8 @@ if (submitInviteBtn) {
         if (!targetUserId) return alert("초대할 사용자 ID를 입력하세요.");
 
         try {
-            const response = await fetch('/invite_to_workspace', {
+            const response = await authFetch('/invite_to_workspace', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ workspaceId: currentInviteWorkspaceId, targetUserId })
             });
             const data = await response.json();
@@ -2248,10 +2265,9 @@ function openWorkspaceDetail(wsId) {
     leaveBtn.onclick = async () => {
         if (confirm('워크스페이스에서 나가시겠습니까?')) {
             try {
-                const res = await fetch('/respond_to_invitation', {
+                const res = await authFetch('/respond_to_invitation', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ workspaceId: ws._id, userId: loggedInUserId, response: 'declined' })
+                    body: JSON.stringify({ workspaceId: ws._id, response: 'declined' })
                 });
                 const data = await res.json();
                 if (data.message === "1") {
@@ -2353,12 +2369,10 @@ if (submitCreateNoteBtn) {
         if (!title) return alert("제목을 입력해주세요.");
 
         try {
-            const response = await fetch('/create_note', {
+            const response = await authFetch('/create_note', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     title,
-                    userId: loggedInUserId,
                     workspaceId: workspaceId || null,
                     inviteAll: inviteAll
                 }),
