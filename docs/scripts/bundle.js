@@ -2905,7 +2905,7 @@ ${err.toString()}`);
         const left = dels[j - 1];
         const right = dels[i];
         if (left.clock + left.len >= right.clock) {
-          left.len = max(left.len, right.clock + right.len - left.clock);
+          dels[j - 1] = new DeleteItem(left.clock, max(left.len, right.clock + right.len - left.clock));
         } else {
           if (j < i) {
             dels[j] = right;
@@ -10086,7 +10086,9 @@ ${reason}`);
     const ydoc = new Doc();
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsHost = window.location.host;
-    const provider = new WebsocketProvider(`${wsProtocol}//${wsHost}/yjs`, noteId, ydoc);
+    const provider = new WebsocketProvider(`${wsProtocol}//${wsHost}/yjs`, noteId, ydoc, {
+      params: { token: user.token || "" }
+    });
     provider.on("status", (event) => {
       console.log("Yjs WebSocket status:", event.status);
     });

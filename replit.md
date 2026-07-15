@@ -21,6 +21,7 @@ A real-time collaborative note-taking application with AI-powered proofreading f
 ## Environment Variables
 - `MONGODB_URI` - MongoDB connection string
 - `MISTRAL_API_KEY` - Mistral AI API key
+- `JWT_SECRET` - Secret used to sign/verify JWT auth tokens. Without it, a random secret is generated at startup (tokens are invalidated on every restart), so set it explicitly for stable sessions in production.
 
 ## Running the App
 The app runs on port 5000 using `node server.js`
