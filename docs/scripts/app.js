@@ -13,6 +13,18 @@ let menu_item = document.querySelector('#mainmenu_item4');
 let register_btn = document.querySelector('#register_submit');
 const addNewNoteBtn = document.querySelector('.add_new_note');
 
+// 사용자 입력값(노트 제목, 워크스페이스 이름, 아이디 등)을 innerHTML에 꽂을 때
+// HTML/스크립트로 해석되지 않도록 이스케이프
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[ch]);
+}
+
 // === JWT Auth Helpers === //
 let authToken = localStorage.getItem('auth_token') || null;
 
@@ -974,16 +986,16 @@ function displayNotes(notes) {
         const summary = plainText.substring(0, 100) + (plainText.length > 100 ? '...' : '');
 
         noteItem.innerHTML = `
-            <div class="note_title">${note.title}</div>
-            <div class="note_summary">${summary || '내용 없음'}</div>
+            <div class="note_title">${escapeHtml(note.title)}</div>
+            <div class="note_summary">${escapeHtml(summary) || '내용 없음'}</div>
             <div class="note_footer">
                 <div class="note_date" style="font-size: 11px; color: #999;">
                     ${new Date(note.createdAt || Date.now()).toLocaleDateString()}
                 </div>
                 <div class="note_editors">
                     ${(note.editors || []).map(editor => `
-                        <div class="editor_badge" title="${editor}">
-                            ${editor.charAt(0).toUpperCase()}
+                        <div class="editor_badge" title="${escapeHtml(editor)}">
+                            ${escapeHtml(editor.charAt(0).toUpperCase())}
                         </div>
                     `).join('')}
                 </div>
@@ -1011,7 +1023,8 @@ function openNoteInEditor(note) {
     // 에디터에 노트 내용 로드
     const editor = document.querySelector('.content');
     if (editor) {
-        editor.innerHTML = note.contents || '';
+        // 원격에서 저장된 HTML은 신뢰할 수 없으므로 렌더링 전 정화(sanitize)
+        editor.innerHTML = window.sanitizeHtml ? window.sanitizeHtml(note.contents || '') : (note.contents || '');
         // 현재 노트 ID 저장 (나중에 저장 기능 구현 시 사용)
         editor.dataset.noteId = note._id;
         editor.dataset.noteTitle = note.title;
@@ -1275,13 +1288,13 @@ async function openOnlineLoadModal() {
         const item = document.createElement('div');
         item.className = 'load-note-item';
         item.innerHTML = `
-            <div class="note-name">${note.title}</div>
+            <div class="note-name">${escapeHtml(note.title)}</div>
             <div class="note-meta">${new Date(note.createdAt || Date.now()).toLocaleDateString()}</div>
         `;
         item.onclick = () => {
             if (confirm(`'${note.title}' 내용을 가져오시겠습니까? 현재 내용은 덮어씌워집니다.`)) {
                 const editor = document.querySelector('.content');
-                editor.innerHTML = note.contents || '';
+                editor.innerHTML = window.sanitizeHtml ? window.sanitizeHtml(note.contents || '') : (note.contents || '');
                 modal.style.display = 'none';
                 showNotification("문서를 불러왔습니다.");
             }
@@ -2060,7 +2073,7 @@ function renderWorkspaces() {
         listContainer.insertAdjacentHTML('beforeend', `
             <div class="workspace-item" onclick="openWorkspaceDetail('${ws._id}')" style="cursor: pointer;">
                 <div class="workspace-info">
-                    <span class="workspace-name">${ws.name}</span>
+                    <span class="workspace-name">${escapeHtml(ws.name)}</span>
                     <span class="workspace-meta">멤버 ${memberCount}명</span>
                 </div>
             </div>
@@ -2088,7 +2101,7 @@ function renderInvitations() {
         div.innerHTML = `
             <div class="invitation-header">
                 <span class="invitation-badge">New</span>
-                <p class="invitation-text"><b>${ws.name}</b> 워크스페이스 초대</p>
+                <p class="invitation-text"><b>${escapeHtml(ws.name)}</b> 워크스페이스 초대</p>
             </div>
             <div class="invitation-actions">
                 <button class="btn-accept" onclick="respondInvitation('${ws._id}', 'accepted')">수락</button>
@@ -2237,7 +2250,7 @@ function openWorkspaceDetail(wsId) {
             card.className = 'ws-note-card';
             card.onclick = () => openNoteInEditor(note);
             card.innerHTML = `
-                <div class="note-title">${note.title}</div>
+                <div class="note-title">${escapeHtml(note.title)}</div>
                 <div class="note-date">${new Date(note.createdAt || Date.now()).toLocaleDateString()}</div>
             `;
             noteList.appendChild(card);
@@ -2251,9 +2264,9 @@ function openWorkspaceDetail(wsId) {
         const div = document.createElement('div');
         div.className = 'member-item';
         div.innerHTML = `
-            <div class="member-avatar">${member.userId.substring(0, 2).toUpperCase()}</div>
+            <div class="member-avatar">${escapeHtml(member.userId.substring(0, 2).toUpperCase())}</div>
             <div class="member-info">
-                <span class="member-name">${member.userId}</span>
+                <span class="member-name">${escapeHtml(member.userId)}</span>
                 <span class="member-status">${member.status === 'accepted' ? '참여 중' : '대기 중'}</span>
             </div>
         `;

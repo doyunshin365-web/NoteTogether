@@ -2,6 +2,7 @@
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import diff from 'fast-diff'
+import DOMPurify from 'dompurify'
 
 export function initCRDT(editorElement, noteId, user, onLogUpdate) {
     console.log('initCRDT called with:', { editorElement, noteId, user })
@@ -268,7 +269,9 @@ export function initCRDT(editorElement, noteId, user, onLogUpdate) {
                 }
             }
 
-            editorElement.innerHTML = markedHTML
+            // 원격에서 온 HTML은 신뢰할 수 없으므로 렌더링 직전에 정화(sanitize)한다.
+            // lastSyncedContent/ytext는 원본(raw) 문자열 기준을 유지해야 diff 동기화 로직이 깨지지 않는다.
+            editorElement.innerHTML = DOMPurify.sanitize(markedHTML)
             lastSyncedContent = newContent
 
             if (markerAdded) {

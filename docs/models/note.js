@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const noteSchema = new mongoose.Schema({
     title: { type: String, required: true },
     contents: { type: String, default: '' },
-    editors: { type: Array, required: true },
+    editors: { type: [String], required: true },
     workspaceId: { type: String, default: null }
 });
 
