@@ -6,11 +6,42 @@ const http = require("http");
 const crypto = require("crypto");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
+const sanitizeHtml = require("sanitize-html");
 const User = require("./docs/models/user");
 const Note = require("./docs/models/note");
 const Workspace = require("./docs/models/workspace");
 const { Mistral } = require("@mistralai/mistralai");
 require("dotenv").config();
+
+// 노트 본문(리치 텍스트 + 도형 SVG)에 허용할 태그/속성만 통과시키고 나머지는 제거한다.
+// 실시간 공동편집(Yjs)은 클라이언트에서 DOMPurify로 별도 정화하지만,
+// 저장된 데이터 자체도 깨끗하게 유지하기 위한 방어선(defense-in-depth)이다.
+const NOTE_CONTENT_SANITIZE_OPTIONS = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+    "div", "span", "u", "font", "mark", "img",
+    "svg", "rect", "circle", "polygon", "polyline", "ellipse", "line", "path", "g"
+  ]),
+  allowedAttributes: {
+    "*": ["style", "class", "id", "contenteditable"],
+    a: ["href", "name", "target", "rel"],
+    img: ["src", "alt", "width", "height"],
+    font: ["color", "size", "face"],
+    svg: ["viewbox", "viewBox", "width", "height", "xmlns"],
+    rect: ["x", "y", "width", "height", "rx", "ry"],
+    circle: ["cx", "cy", "r"],
+    ellipse: ["cx", "cy", "rx", "ry"],
+    line: ["x1", "y1", "x2", "y2"],
+    polygon: ["points"],
+    polyline: ["points"],
+    path: ["d"],
+  },
+  allowedSchemes: ["http", "https", "mailto", "data"],
+};
+
+function sanitizeNoteContents(html) {
+  return sanitizeHtml(html || "", NOTE_CONTENT_SANITIZE_OPTIONS);
+}
 
 // === JWT Setup ===
 // JWT_SECRET should be set via environment variable in production.
@@ -21,6 +52,12 @@ if (!process.env.JWT_SECRET) {
 }
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 const JWT_EXPIRES_IN = "30d";
+const JWT_ALGORITHMS = ["HS256"];
+
+// 아이디는 영문/숫자/밑줄/하이픈 3~20자로 제한한다.
+// 이렇게 하면 Mongo 쿼리 연산자 주입(NoSQL injection)도 막고,
+// 아이디가 그대로 화면에 표시되는 곳(워크스페이스 멤버 목록 등)의 XSS 위험도 함께 줄어든다.
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
@@ -30,7 +67,7 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ message: "-1", error: "Authentication required" });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITHMS }, (err, decoded) => {
     if (err) {
       return res.status(403).json({ message: "-1", error: "Invalid or expired token" });
     }
@@ -61,7 +98,7 @@ server.on('upgrade', async (request, socket, head) => {
       const noteId = parsedUrl.pathname.replace(/^\/yjs\/?/, '');
 
       if (!token) throw new Error("Missing token");
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITHMS });
 
       const note = await Note.findById(noteId);
       if (!note || !note.editors.includes(decoded.id)) {
@@ -104,11 +141,30 @@ app.use(cors());
 
 const PORT = 5000;
 
+// 로그인/회원가입 무차별 대입(brute-force) 공격 방지
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "-1", error: "Too many attempts. Please try again later." }
+});
+
 // === Auth Routes ===
 
 // Register
-app.post("/register", async (req, res) => {
+app.post("/register", authLimiter, async (req, res) => {
   const { id, pw } = req.body;
+
+  if (typeof id !== "string" || typeof pw !== "string") {
+    return res.status(400).json({ message: "-1", error: "Invalid id or password" });
+  }
+  if (!USERNAME_REGEX.test(id)) {
+    return res.status(400).json({ message: "-1", error: "아이디는 영문/숫자/_/- 3~20자여야 합니다." });
+  }
+  if (pw.length < 6) {
+    return res.status(400).json({ message: "-1", error: "비밀번호는 6자 이상이어야 합니다." });
+  }
 
   try {
     const exists = await User.findOne({ id });
@@ -131,8 +187,12 @@ app.post("/register", async (req, res) => {
 });
 
 // Login
-app.post("/login", async (req, res) => {
+app.post("/login", authLimiter, async (req, res) => {
   const { id, pw } = req.body;
+
+  if (typeof id !== "string" || typeof pw !== "string") {
+    return res.status(400).json({ message: "-1" });
+  }
 
   try {
     const user = await User.findOne({ id });
@@ -143,7 +203,7 @@ app.post("/login", async (req, res) => {
 
     const desc = user.desc;
     const pf = user.profileImage;
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, algorithm: JWT_ALGORITHMS[0] });
 
     res.json({ message: "2", desc, pf, id: user.id, token });
   } catch (err) {
@@ -171,17 +231,28 @@ app.post("/create_note", authenticateToken, async (req, res) => {
   const { title, workspaceId, inviteAll } = req.body;
   const userId = req.userId;
 
-  if (!title) {
+  if (typeof title !== "string" || !title.trim()) {
     return res.status(400).json({ message: "-1", error: "Missing title" });
+  }
+  if (workspaceId !== undefined && workspaceId !== null && typeof workspaceId !== "string") {
+    return res.status(400).json({ message: "-1", error: "Invalid workspaceId" });
   }
 
   try {
     let editors = [userId];
 
-    // 워크스페이스 멤버 일괄 초대 옵션이 켜져 있고 워크스페이스 ID가 있는 경우
-    if (workspaceId && inviteAll) {
+    if (workspaceId) {
       const workspace = await Workspace.findById(workspaceId);
-      if (workspace) {
+      const isMember = workspace && (
+        workspace.owner === userId ||
+        workspace.members.some(m => m.userId === userId && m.status === 'accepted')
+      );
+      if (!isMember) {
+        return res.status(403).json({ message: "-1", error: "Not authorized to create a note in this workspace" });
+      }
+
+      // 워크스페이스 멤버 일괄 초대 옵션이 켜져 있는 경우
+      if (inviteAll) {
         const acceptedMembers = workspace.members
           .filter(m => m.status === 'accepted')
           .map(m => m.userId);
@@ -236,7 +307,7 @@ app.post("/save_note", authenticateToken, async (req, res) => {
       return res.status(403).json({ message: "-1", error: "Not authorized to edit this note" });
     }
 
-    note.contents = contents || "";
+    note.contents = sanitizeNoteContents(contents);
     await note.save();
 
     res.json({ message: "1", noteId: note._id });
@@ -249,7 +320,7 @@ app.post("/save_note", authenticateToken, async (req, res) => {
 app.post("/add_member", authenticateToken, async (req, res) => {
   const { noteId, userId } = req.body;
 
-  if (!noteId || !userId) {
+  if (typeof noteId !== "string" || typeof userId !== "string" || !noteId || !userId) {
     return res.status(400).json({ message: "-1", error: "Missing noteId or userId" });
   }
 
@@ -289,7 +360,7 @@ app.post("/create_workspace", authenticateToken, async (req, res) => {
   const { name } = req.body;
   const ownerId = req.userId;
 
-  if (!name) {
+  if (typeof name !== "string" || !name.trim()) {
     return res.status(400).json({ message: "-1", error: "Missing name" });
   }
 
@@ -323,6 +394,10 @@ app.post("/get_workspaces", authenticateToken, async (req, res) => {
 
 app.post("/invite_to_workspace", authenticateToken, async (req, res) => {
   const { workspaceId, targetUserId } = req.body;
+
+  if (typeof workspaceId !== "string" || typeof targetUserId !== "string" || !workspaceId || !targetUserId) {
+    return res.status(400).json({ message: "-1", error: "Missing workspaceId or targetUserId" });
+  }
 
   try {
     const workspace = await Workspace.findById(workspaceId);
@@ -444,7 +519,7 @@ io.use((socket, next) => {
   const token = socket.handshake.auth && socket.handshake.auth.token;
   if (!token) return next(new Error("Authentication required"));
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITHMS }, (err, decoded) => {
     if (err) return next(new Error("Invalid or expired token"));
     socket.userId = decoded.id;
     next();
