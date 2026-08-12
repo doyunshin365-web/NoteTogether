@@ -597,28 +597,41 @@ io.on("connection", (socket) => {
     console.log(`User ${userId} left note ${noteId}`);
   });
 
+  // 노트 방(room)의 멤버만 해당 노트로 이벤트를 보낼 수 있도록 검증.
+  // join-note에서 이미 editors 권한을 확인한 뒤 방에 join시키므로,
+  // socket.rooms에 noteId가 있다는 것은 곧 그 노트에 접근 권한이 있다는 뜻이다.
+  // (추가 DB 조회 없이도 위조된 noteId로 다른 노트 세션에 이벤트를 주입하는 것을 막는다.)
+  function isInNoteRoom(socket, noteId) {
+    return typeof noteId === "string" && socket.rooms.has(noteId);
+  }
+
   // 커서 위치 전송
   socket.on("cursor-move", ({ noteId, position, color }) => {
+    if (!isInNoteRoom(socket, noteId)) return;
     socket.to(noteId).emit("cursor-update", { userId: socket.userId, position, color });
   });
 
   // 텍스트 선택 영역 전송
   socket.on("selection-change", ({ noteId, range, color }) => {
+    if (!isInNoteRoom(socket, noteId)) return;
     socket.to(noteId).emit("selection-update", { userId: socket.userId, range, color });
   });
 
   // 내용 변경 전송
   socket.on("content-change", ({ noteId, content }) => {
+    if (!isInNoteRoom(socket, noteId)) return;
     socket.to(noteId).emit("content-update", { userId: socket.userId, content });
   });
 
   // 영역 잠금 (AI 교정 중)
   socket.on("lock-region", ({ noteId, range }) => {
+    if (!isInNoteRoom(socket, noteId)) return;
     socket.to(noteId).emit("region-locked", { userId: socket.userId, range });
   });
 
   // 영역 잠금 해제
   socket.on("unlock-region", ({ noteId }) => {
+    if (!isInNoteRoom(socket, noteId)) return;
     socket.to(noteId).emit("region-unlocked", { userId: socket.userId });
   });
 
